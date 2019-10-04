@@ -19,14 +19,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from .constants import *
-from .structs import *
-from .utils import *
-from .server import *
-from .base_mock_controller import *
-from .simple_mock_controller import *
+__all__ = ["CMD_SERVER_PORT", "TEL_SERVER_PORT", "LOCAL_HOST"]
 
-try:
-    from .version import *
-except ImportError:
-    __version__ = "?"
+CMD_SERVER_PORT = 5571
+TEL_SERVER_PORT = 5570
+
+LOCAL_HOST = "127.0.0.1"

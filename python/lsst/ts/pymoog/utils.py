@@ -19,14 +19,36 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from .constants import *
-from .structs import *
-from .utils import *
-from .server import *
-from .base_mock_controller import *
-from .simple_mock_controller import *
+__all__ = ["read_into", "write_from"]
 
-try:
-    from .version import *
-except ImportError:
-    __version__ = "?"
+import ctypes
+
+
+async def read_into(reader, struct):
+    """Read binary data from a socket into a `ctypes.Structure`.
+
+    Parameters
+    ----------
+    reader :  `asyncio.StreamReader`
+        Asynchronous stream reader.
+    struct : `ctypes.Structure`
+        Structure to set.
+    """
+    nbytes = ctypes.sizeof(struct)
+    data = await reader.read(nbytes)
+    ctypes.memmove(ctypes.addressof(struct), data, nbytes)
+
+
+async def write_from(writer, *structs):
+    r"""Write binary data from one or `ctypes.Structure`\ s to a socket.
+
+    Parameters
+    ----------
+    writer : `asyncio.StreamWriter`
+        Asynchronous stream writer.
+    structs : `ctypes.Structure`
+        One or more structures to write.
+    """
+    for struct in structs:
+        writer.write(bytes(struct))
+        await writer.drain()

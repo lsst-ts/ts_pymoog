@@ -6,17 +6,16 @@
 lsst.ts.pymoog
 ##############
 
-.. Paragraph that describes what this Python module does and links to related modules and frameworks.
+Python support for the Moog TCP/IP controllers for the main telescope hexapods and rotator.
 
-.. .. _lsst.ts.pymoog-using:
+.. _lsst.ts.pymoog-using:
 
-.. Using lsst.ts.pymoog
-.. =====================
+Using lsst.ts.pymoog
+=====================
 
-.. toctree linking to topics related to using the module's APIs.
-
-.. .. toctree::
-..    :maxdepth: 1
+.. toctree::
+   moog_overview
+   :maxdepth: 2
 
 .. _lsst.ts.pymoog-contributing:
 
