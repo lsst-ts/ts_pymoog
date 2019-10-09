@@ -1,4 +1,4 @@
-# This file is part of ts_pymoog.
+# This file is part of ts_hexrotcomm.
 #
 # Developed for the LSST Data Management System.
 # This product includes software developed by the LSST Project
@@ -19,7 +19,9 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-try:
-    from .version import *
-except ImportError:
-    __version__ = "?"
+__all__ = ["CMD_SERVER_PORT", "TEL_SERVER_PORT", "LOCAL_HOST"]
+
+CMD_SERVER_PORT = 5571
+TEL_SERVER_PORT = 5570
+
+LOCAL_HOST = "127.0.0.1"

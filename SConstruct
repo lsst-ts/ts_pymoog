@@ -1,4 +1,4 @@
 # -*- python -*-
 from lsst.sconsUtils import scripts
-# Python-only package
-scripts.BasicSConstruct("ts_pymoog", disableCc=True)
+
+scripts.BasicSConstruct("ts_hexrotcomm", disableCc=True, noCfgFile=True)
