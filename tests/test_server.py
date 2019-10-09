@@ -1,4 +1,4 @@
-# This file is part of ts_pymoog.
+# This file is part of ts_hexrotcomm.
 #
 # Developed for the LSST Data Management System.
 # This product includes software developed by the LSST Project
@@ -26,7 +26,7 @@ import unittest
 
 import asynctest
 
-from lsst.ts import pymoog
+from lsst.ts import hexrotcomm
 
 STD_TIMEOUT = 0.1  # standard timeout for TCP/IP messages (sec)
 
@@ -46,26 +46,25 @@ class ServerTestCase(asynctest.TestCase):
         log = logging.getLogger()
         log.setLevel(logging.DEBUG)
         log.addHandler(logging.StreamHandler())
-        self.server = pymoog.Server(host=pymoog.LOCAL_HOST,
-                                    log=log,
-                                    ConfigClass=pymoog.SimpleConfig,
-                                    TelemetryClass=pymoog.SimpleTelemetry,
-                                    config_callback=self.config_callback,
-                                    telemetry_callback=self.telemetry_callback)
+        self.server = hexrotcomm.Server(host=hexrotcomm.LOCAL_HOST,
+                                        log=log,
+                                        ConfigClass=hexrotcomm.SimpleConfig,
+                                        TelemetryClass=hexrotcomm.SimpleTelemetry,
+                                        config_callback=self.config_callback,
+                                        telemetry_callback=self.telemetry_callback)
 
-        config = pymoog.SimpleConfig()
+        config = hexrotcomm.SimpleConfig()
         config.min_position = self.initial_min_position
         config.max_position = self.initial_max_position
-        telemetry = pymoog.SimpleTelemetry()
+        telemetry = hexrotcomm.SimpleTelemetry()
         telemetry.position = self.initial_position
-        self.mock_ctrl = pymoog.SimpleMockController(log=log, config=config, telemetry=telemetry)
+        self.mock_ctrl = hexrotcomm.SimpleMockController(log=log, config=config, telemetry=telemetry)
         await asyncio.gather(self.server.start_task, self.mock_ctrl.connect_task)
 
     async def tearDown(self):
         await asyncio.gather(self.mock_ctrl.close(), self.server.close())
 
     def config_callback(self, server):
-        print("config_callback")
         self.config_list.append(server.config)
         if not self.config_future.done():
             self.config_future.set_result(None)
@@ -159,8 +158,8 @@ class ServerTestCase(asynctest.TestCase):
         if desired_position is None:
             desired_position = cmd_position
 
-        command = pymoog.Command()
-        command.cmd = pymoog.SimpleCommandType.SET_POSITION
+        command = hexrotcomm.Command()
+        command.cmd = hexrotcomm.SimpleCommandType.SET_POSITION
         command.param1 = cmd_position
         await self.server.put_command(command)
 
@@ -176,8 +175,8 @@ class ServerTestCase(asynctest.TestCase):
     async def check_config_min_max_position_command(self, min_position, max_position):
         config_task = asyncio.create_task(self.next_config())
 
-        command = pymoog.Command()
-        command.cmd = pymoog.SimpleCommandType.CONFIG_MIN_MAX_POSITION
+        command = hexrotcomm.Command()
+        command.cmd = hexrotcomm.SimpleCommandType.CONFIG_MIN_MAX_POSITION
         command.param1 = min_position
         command.param2 = max_position
         await self.server.put_command(command)

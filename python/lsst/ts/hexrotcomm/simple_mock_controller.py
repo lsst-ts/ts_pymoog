@@ -1,4 +1,4 @@
-# This file is part of ts_pymoog.
+# This file is part of ts_hexrotcomm.
 #
 # Developed for the LSST Data Management System.
 # This product includes software developed by the LSST Project
@@ -87,7 +87,6 @@ class SimpleMockController(base_mock_controller.BaseMockController):
         if command.cmd == SimpleCommandType.SET_POSITION:
             position = command.param1
             if self.config.min_position <= position <= self.config.max_position:
-                print(f"Set telemetry.position={position}")
                 self.telemetry.position = position
             else:
                 self.log.error("Commanded position out of range; ignoring the command.")

@@ -1,5 +1,6 @@
-#########
-ts_pymoog
-#########
+#############
+ts_hexrotcomm
+#############
 
-``ts_pymoog`` contains Python code for communicating with and emulating the TCP/IP controller interface written by Moog for the MT hexapods and camera rotator.
+This package provides Python code to communicate with the main telescope camera rotator and hexapod controllers written by Moog,
+plus a base class for mock controllers.

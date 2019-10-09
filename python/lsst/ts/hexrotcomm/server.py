@@ -1,4 +1,4 @@
-# This file is part of ts_pymoog.
+# This file is part of ts_hexrotcomm.
 #
 # Developed for the LSST Data Management System.
 # This product includes software developed by the LSST Project
@@ -57,6 +57,7 @@ class Server:
     def __init__(self, host, log, ConfigClass, TelemetryClass, config_callback, telemetry_callback):
         self.host = host
         self.log = log.getChild("Server")
+        self.header = structs.Header()
         self.config = ConfigClass()
         self.telemetry = TelemetryClass()
         self.config_callback = config_callback
@@ -71,7 +72,17 @@ class Server:
         self.start_task = asyncio.create_task(self.start())
 
     async def set_command_writer(self, reader, writer):
-        """Send commands to the Moog controller.
+        """Set self.command_writer.
+
+        Called when the Moog controller connects to the command server.
+
+        Parameters
+        ----------
+        reader : `asyncio.SocketReader`
+            Command reader. Ignored because the Moog controller
+            does not write data to its command socket.
+        writer : `asyncio.SocketWriter`
+            Socket writer to send commands to the Moog controller.
         """
         if self.command_writer is not None:
             raise RuntimeError("Cannot write commands to more than one client")
@@ -80,28 +91,38 @@ class Server:
 
     async def read_telemetry_and_config(self, reader, writer):
         """Read telemetry and configuration from the Moog controller.
+
+        Called when the Moog controller connects to the telemetry server.
+
+        Parameters
+        ----------
+        reader : `asyncio.SocketReader`
+            Socket reader to read telemetry and config from the Moog
+            controller.
+        writer : `asyncio.SocketWriter`
+            Socket writer. Ignored because the Moog controller does not read
+            data from its telemetry and config socket.
         """
         if self._read_tel_running:
             raise RuntimeError("Cannot have two read_telemetry_and_config loops running")
         self._read_tel_running = True
         self.telemetry_reader_task.set_result(None)
         while True:
-            header = structs.Header()
-            await utils.read_into(reader, header)
-            if header.frame_id == self.config.FRAME_ID:
+            await utils.read_into(reader, self.header)
+            if self.header.frame_id == self.config.FRAME_ID:
                 await utils.read_into(reader, self.config)
                 try:
                     self.config_callback(self)
                 except Exception:
                     self.log.exception("config_callback failed")
-            elif header.frame_id == self.telemetry.FRAME_ID:
+            elif self.header.frame_id == self.telemetry.FRAME_ID:
                 await utils.read_into(reader, self.telemetry)
                 try:
                     self.telemetry_callback(self)
                 except Exception:
                     self.log.exception("telemetry_callback failed")
             else:
-                raise RuntimeError(f"Invalid data read on the telemetry socket; frame_id={header.frame_id}")
+                raise RuntimeError("Invalid telemetry data read: unknown frame_id={self.header.frame_id}")
 
     async def put_command(self, cmd):
         """Write a command to the controller.

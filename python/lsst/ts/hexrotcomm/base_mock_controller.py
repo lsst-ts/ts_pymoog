@@ -1,4 +1,4 @@
-# This file is part of ts_pymoog.
+# This file is part of ts_hexrotcomm.
 #
 # Developed for the LSST Data Management System.
 # This product includes software developed by the LSST Project
@@ -26,7 +26,6 @@ import math
 
 import astropy.time
 
-from lsst.ts import salobj
 from . import constants
 from . import structs
 from . import utils
@@ -72,6 +71,10 @@ class BaseMockController(metaclass=abc.ABCMeta):
 
     def __init__(self, log, config, telemetry):
         self.log = log.getChild("BaseMockController")
+        # A dictionary of frame ID: header for telemetry and config data
+        # Keeping separate headers for telemetry and config allows
+        # updating just the relevant fields, rather than creating a new
+        # header insteance for each telemetry and config message.
         self.headers = dict()
         for frame_id in (config.FRAME_ID, telemetry.FRAME_ID):
             header = structs.Header()
@@ -83,8 +86,10 @@ class BaseMockController(metaclass=abc.ABCMeta):
         self.cmd_writer = None  # not written
         self.tel_reader = None  # not read
         self.tel_writer = None
-        self.cmd_loop_task = salobj.make_done_future()
-        self.tel_loop_task = salobj.make_done_future()
+        self.cmd_loop_task = asyncio.Future()
+        self.cmd_loop_task.set_result(None)
+        self.tel_loop_task = asyncio.Future()
+        self.tel_loop_task.set_result(None)
         self.connect_task = asyncio.create_task(self.connect())
 
     @property
@@ -140,14 +145,14 @@ class BaseMockController(metaclass=abc.ABCMeta):
         await self.close(kill_connect=False)
         self.log.debug("connect: making connections")
         while True:
-            coros = []
+            coroutines = []
             if self.cmd_reader is None:
-                coros.append(self.connect_cmd())
+                coroutines.append(self.connect_cmd())
             if self.tel_writer is None:
-                coros.append(self.connect_tel())
-            if coros:
+                coroutines.append(self.connect_tel())
+            if coroutines:
                 try:
-                    await asyncio.gather(*coros)
+                    await asyncio.gather(*coroutines)
                     break
                 except Exception:
                     await asyncio.sleep(self.connect_retry_interval)
@@ -160,14 +165,16 @@ class BaseMockController(metaclass=abc.ABCMeta):
     async def connect_cmd(self):
         """Connect to the command socket.
         """
-        connect_coro = asyncio.open_connection(host=constants.LOCAL_HOST, port=constants.CMD_SERVER_PORT)
+        connect_coro = asyncio.open_connection(host=constants.LOCAL_HOST,
+                                               port=constants.CMD_SERVER_PORT)
         self.cmd_reader, self.cmd_writer = await asyncio.wait_for(connect_coro,
                                                                   timeout=self.connect_timeout)
 
     async def connect_tel(self):
-        """Connect to the telemetry socket.
+        """Connect to the telemetry/configuration socket.
         """
-        connect_coro = asyncio.open_connection(host=constants.LOCAL_HOST, port=constants.TEL_SERVER_PORT)
+        connect_coro = asyncio.open_connection(host=constants.LOCAL_HOST,
+                                               port=constants.TEL_SERVER_PORT)
         self.tel_reader, self.tel_writer = await asyncio.wait_for(connect_coro,
                                                                   timeout=self.connect_timeout)
 
@@ -189,7 +196,7 @@ class BaseMockController(metaclass=abc.ABCMeta):
                 return
 
     async def tel_loop(self):
-        """Write telemetry and configuration.
+        """Write configuration once, then telemetry at regular intervals.
         """
         self.log.info("tel_loop begins")
         try:
@@ -213,7 +220,9 @@ class BaseMockController(metaclass=abc.ABCMeta):
         await utils.write_from(self.tel_writer, header, self.config)
 
     def update_and_get_header(self, frame_id):
-        """Update the specified header and return it.
+        """Update the config or telemetry header and return it.
+
+        Call this prior to writing telemetry or configuration.
 
         Parameters
         ----------
