@@ -22,7 +22,8 @@
 from .constants import *
 from .structs import *
 from .utils import *
-from .server import *
+from .one_client_server import *
+from .command_telemetry_server import *
 from .base_mock_controller import *
 from .simple_mock_controller import *
 

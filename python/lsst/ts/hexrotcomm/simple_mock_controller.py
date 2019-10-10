@@ -22,7 +22,6 @@ __all__ = ["SimpleCommandType", "SimpleConfig", "SimpleTelemetry", "SimpleMockCo
 
 import ctypes
 import enum
-import time
 
 from . import base_mock_controller
 
@@ -49,7 +48,7 @@ class SimpleTelemetry(ctypes.Structure):
     _pack_ = 1
     _fields_ = [
         ("position", ctypes.c_double),
-        ("time", ctypes.c_double),
+        ("seq_num", ctypes.c_uint),
     ]
     FRAME_ID = 0x5
 
@@ -65,6 +64,12 @@ class SimpleMockController(base_mock_controller.BaseMockController):
         Initial configuration. Updated by the ``SET_POSITION`` command.
     telemetry : `SimpleTelemetry`
         Initial telemetry. Updated at regular intervals.
+    command_port : `int` (optional)
+        Command socket port.  This argument is intended for unit tests;
+        use the default value for normal operation.
+    telemetry_port : `int` (optional)
+        Telemetry socket port. This argument is intended for unit tests;
+        use the default value for normal operation.
 
     Notes
     -----
@@ -103,4 +108,4 @@ class SimpleMockController(base_mock_controller.BaseMockController):
             self.log.error(f"Unknown command {command.cmd}; ignoring the command.")
 
     async def update_telemetry(self):
-        self.telemetry.time = time.time()
+        self.telemetry.seq_num += 1
