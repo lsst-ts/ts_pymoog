@@ -48,6 +48,12 @@ class BaseMockController(metaclass=abc.ABCMeta):
         Configuration data. May be modified.
     telemetry : `ctypes.Structure`
         Telemetry data. Modified by `update_telemetry`.
+    command_port : `int` (optional)
+        Command socket port.  This argument is intended for unit tests;
+        use the default value for normal operation.
+    telemetry_port : `int` (optional)
+        Telemetry socket port. This argument is intended for unit tests;
+        use the default value for normal operation.
 
     Notes
     -----
@@ -63,18 +69,19 @@ class BaseMockController(metaclass=abc.ABCMeta):
     telemetry_interval = 0.1
     """Interval between telemetry messages (sec)."""
 
-    connect_timeout = 5
-    """Time limit to make a connection (sec)."""
-
-    connect_retry_interval = 0.5
+    connect_retry_interval = 0.1
     """Interval between connection retries (sec)."""
 
-    def __init__(self, log, config, telemetry):
+    def __init__(self, log, config, telemetry,
+                 command_port=constants.COMMAND_PORT,
+                 telemetry_port=constants.TELEMETRY_PORT):
         self.log = log.getChild("BaseMockController")
         # A dictionary of frame ID: header for telemetry and config data
         # Keeping separate headers for telemetry and config allows
         # updating just the relevant fields, rather than creating a new
         # header insteance for each telemetry and config message.
+        self.command_port = command_port
+        self.telemetry_port = telemetry_port
         self.headers = dict()
         for frame_id in (config.FRAME_ID, telemetry.FRAME_ID):
             header = structs.Header()
@@ -82,21 +89,37 @@ class BaseMockController(metaclass=abc.ABCMeta):
             self.headers[frame_id] = header
         self.config = config
         self.telemetry = telemetry
-        self.cmd_reader = None
-        self.cmd_writer = None  # not written
-        self.tel_reader = None  # not read
-        self.tel_writer = None
-        self.cmd_loop_task = asyncio.Future()
-        self.cmd_loop_task.set_result(None)
-        self.tel_loop_task = asyncio.Future()
-        self.tel_loop_task.set_result(None)
+        self.command_reader = None
+        self.command_writer = None  # not written
+        self.telemetry_reader = None  # not read
+        self.telemetry_writer = None
+        self.command_loop_task = asyncio.Future()
+        self.command_loop_task.set_result(None)
+        self.telemetry_loop_task = asyncio.Future()
+        self.telemetry_loop_task.set_result(None)
         self.connect_task = asyncio.create_task(self.connect())
 
     @property
     def connected(self):
-        """Are both sockets connected?
+        """Return True if command and telemetry sockets are connected.
         """
-        return self.cmd_reader is not None and self.tel_writer is not None
+        return self.command_connected and self.telemetry_connected
+
+    @property
+    def command_connected(self):
+        """Return True if the command socket is connected.
+        """
+        return not (self.command_writer is None or
+                    self.command_writer.is_closing() or
+                    self.command_reader.at_eof())
+
+    @property
+    def telemetry_connected(self):
+        """Return True if the telemetry socket is connected.
+        """
+        return not (self.telemetry_writer is None or
+                    self.telemetry_writer.is_closing() or
+                    self.telemetry_reader.at_eof())
 
     @abc.abstractmethod
     async def run_command(self, command):
@@ -115,109 +138,133 @@ class BaseMockController(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError()
 
-    async def close(self, kill_connect=True):
+    async def close(self):
         """Kill command and telemetry tasks and close the connections.
 
         Always safe to call.
         """
-        self.log.debug(f"close(kill_connect={kill_connect})")
-        self.cmd_loop_task.cancel()
-        self.tel_loop_task.cancel()
-        if kill_connect:
-            self.connect_task.cancel()
-        if self.cmd_writer is not None:
-            self.cmd_writer.close()
-        if self.tel_writer is not None:
-            self.tel_writer.close()
-        self.cmd_reader = None
-        self.cmd_writer = None
-        self.tel_reader = None
-        self.tel_writer = None
+        self.log.debug(f"close()")
+        self.connect_task.cancel()
+        self._basic_close()
+        self.command_reader = None
+        self.command_writer = None
+        self.telemetry_reader = None
+        self.telemetry_writer = None
+
+    def _basic_close(self):
+        """Halt command and telemetry loops and close the connections.
+        """
+        self.command_loop_task.cancel()
+        self.telemetry_loop_task.cancel()
+        if self.command_connected:
+            self.command_writer.close()
+        if self.telemetry_connected:
+            self.telemetry_writer.close()
 
     async def connect(self):
-        """Connect ore reconnect the sockets.
+        """Connect the sockets.
 
         Notes
         -----
-        This will wait forever for a connection
+        This will wait forever for a connection.
         """
         self.log.info("connect")
-        await self.close(kill_connect=False)
+        self._basic_close()
         self.log.debug("connect: making connections")
-        while True:
-            coroutines = []
-            if self.cmd_reader is None:
-                coroutines.append(self.connect_cmd())
-            if self.tel_writer is None:
-                coroutines.append(self.connect_tel())
-            if coroutines:
-                try:
-                    await asyncio.gather(*coroutines)
-                    break
-                except Exception:
-                    await asyncio.sleep(self.connect_retry_interval)
-                    self.log.debug("connect: retry connection")
+        coroutines = []
+        if self.command_reader is None:
+            coroutines.append(self.connect_command())
+        if self.telemetry_writer is None:
+            coroutines.append(self.connect_telemetry())
+        if coroutines:
+            await asyncio.gather(*coroutines)
 
         self.log.debug("connect: starting command and telemetry loops")
-        self.cmd_loop_task = asyncio.create_task(self.cmd_loop())
-        self.tel_loop_task = asyncio.create_task(self.tel_loop())
+        self.command_loop_task = asyncio.create_task(self.command_loop())
+        self.telemetry_loop_task = asyncio.create_task(self.telemetry_loop())
 
-    async def connect_cmd(self):
-        """Connect to the command socket.
+    async def connect_command(self):
+        """Connect or reconnect to the command socket.
+
+        Notes
+        -----
+        This will wait forever for a connection.
         """
-        connect_coro = asyncio.open_connection(host=constants.LOCAL_HOST,
-                                               port=constants.CMD_SERVER_PORT)
-        self.cmd_reader, self.cmd_writer = await asyncio.wait_for(connect_coro,
-                                                                  timeout=self.connect_timeout)
+        if self.command_writer is not None and not self.command_writer.is_closing():
+            self.command_writer.close()
+        while True:
+            try:
+                self.command_reader, self.command_writer = \
+                    await asyncio.open_connection(host=constants.LOCAL_HOST, port=self.command_port)
+                return
+            except Exception:
+                self.log.exception("connect_command failed; retrying")
+                await asyncio.sleep(self.connect_retry_interval)
 
-    async def connect_tel(self):
-        """Connect to the telemetry/configuration socket.
+    async def connect_telemetry(self):
+        """Connect or reconnect to the telemetry/configuration socket.
+
+        Notes
+        -----
+        This will wait forever for a connection.
         """
-        connect_coro = asyncio.open_connection(host=constants.LOCAL_HOST,
-                                               port=constants.TEL_SERVER_PORT)
-        self.tel_reader, self.tel_writer = await asyncio.wait_for(connect_coro,
-                                                                  timeout=self.connect_timeout)
+        if self.telemetry_writer is not None and not self.telemetry_writer.is_closing():
+            self.telemetry_writer.close()
+        while True:
+            try:
+                self.telemetry_reader, self.telemetry_writer = \
+                    await asyncio.open_connection(host=constants.LOCAL_HOST, port=self.telemetry_port)
+                return
+            except Exception:
+                self.log.exception("connect_telemetry failed; retrying")
+                await asyncio.sleep(self.connect_retry_interval)
 
-    async def cmd_loop(self):
+    async def command_loop(self):
         """Read and execute commands.
         """
-        self.log.info("cmd_loop begins")
-        while self.cmd_reader is not None:
+        self.log.info("command_loop begins")
+        while self.command_reader is not None:
             try:
                 command = structs.Command()
-                await utils.read_into(self.cmd_reader, command)
+                await utils.read_into(self.command_reader, command)
                 await self.run_command(command)
             except asyncio.CancelledError:
-                pass
+                raise
+            except ConnectionError:
+                self.log.error("Command socket closed; reconnecting")
+                asyncio.ensure_future(self.connect_command())
+                raise
             except Exception:
-                self.log.exception("cmd_loop failed; reconnecting")
+                self.log.exception("command_loop failed; reconnecting")
                 # disconnect and try again
-                asyncio.ensure_future(self.connect())
-                return
+                asyncio.ensure_future(self.connect_command())
+                raise
 
-    async def tel_loop(self):
+    async def telemetry_loop(self):
         """Write configuration once, then telemetry at regular intervals.
         """
-        self.log.info("tel_loop begins")
+        self.log.info("telemetry_loop begins")
         try:
             await self.write_config()
-            while self.tel_writer is not None:
+            while self.telemetry_connected:
                 header = self.update_and_get_header(self.telemetry.FRAME_ID)
                 await self.update_telemetry()
-                await utils.write_from(self.tel_writer, header, self.telemetry)
+                await utils.write_from(self.telemetry_writer, header, self.telemetry)
                 await asyncio.sleep(self.telemetry_interval)
+            self.log.warning("Telemetry socket disconnected; reconnecting")
+            asyncio.ensure_future(self.connect_telemetry())
         except asyncio.CancelledError:
             pass
         except Exception:
-            self.log.exception("tel_loop failed; reconnecting")
-            asyncio.ensure_future(self.connect())
+            self.log.exception("telemetry_loop failed; reconnecting")
+            asyncio.ensure_future(self.connect_telemetry())
 
     async def write_config(self):
         """Write the current configuration.
         """
-        assert self.tel_writer is not None
+        assert self.telemetry_writer is not None
         header = self.update_and_get_header(self.config.FRAME_ID)
-        await utils.write_from(self.tel_writer, header, self.config)
+        await utils.write_from(self.telemetry_writer, header, self.config)
 
     def update_and_get_header(self, frame_id):
         """Update the config or telemetry header and return it.

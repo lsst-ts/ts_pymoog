@@ -33,9 +33,16 @@ async def read_into(reader, struct):
         Asynchronous stream reader.
     struct : `ctypes.Structure`
         Structure to set.
+
+    Raises
+    ------
+    ConnectionError
+        If the connection is closed.
     """
     nbytes = ctypes.sizeof(struct)
     data = await reader.read(nbytes)
+    if not data:
+        raise ConnectionError()
     ctypes.memmove(ctypes.addressof(struct), data, nbytes)
 
 
