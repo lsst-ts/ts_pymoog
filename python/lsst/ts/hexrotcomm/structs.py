@@ -26,11 +26,13 @@ import ctypes
 
 class Command(ctypes.Structure):
     """Command for Moog controller.
+
+    Called ``commandStreamStructure_t`` in the Moog code.
     """
     _pack_ = 1
     _fields_ = [
         ("sync_pattern", ctypes.c_ushort),
-        ("counter", ctypes.c_ushort),
+        ("counter", ctypes.c_uint),
         ("cmd", ctypes.c_uint),
         ("param1", ctypes.c_double),
         ("param2", ctypes.c_double),
@@ -43,12 +45,14 @@ class Command(ctypes.Structure):
 
 class Header(ctypes.Structure):
     """Initial part of telemetry or configuration data from a Moog controller.
+
+    Called ``telemetryHeaderStructure_t`` in the Moog code.
     """
     _pack_ = 1
     _fields_ = [
         ("sync_pattern", ctypes.c_ushort),
         ("frame_id", ctypes.c_ushort),
-        ("counter", ctypes.c_ushort),
+        ("counter", ctypes.c_uint),
         ("mjd", ctypes.c_int),
         ("mjd_frac", ctypes.c_double),
         ("tv_sec", ctypes.c_int64),
