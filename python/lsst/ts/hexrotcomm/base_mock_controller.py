@@ -197,8 +197,8 @@ class BaseMockController(metaclass=abc.ABCMeta):
                 self.command_reader, self.command_writer = \
                     await asyncio.open_connection(host=constants.LOCAL_HOST, port=self.command_port)
                 return
-            except Exception:
-                self.log.exception("connect_command failed; retrying")
+            except Exception as e:
+                self.log.warning(f"connect_command failed with {e}; retrying")
                 await asyncio.sleep(self.connect_retry_interval)
 
     async def connect_telemetry(self):
@@ -215,8 +215,8 @@ class BaseMockController(metaclass=abc.ABCMeta):
                 self.telemetry_reader, self.telemetry_writer = \
                     await asyncio.open_connection(host=constants.LOCAL_HOST, port=self.telemetry_port)
                 return
-            except Exception:
-                self.log.exception("connect_telemetry failed; retrying")
+            except Exception as e:
+                self.log.warning(f"connect_telemetry failed with {e}; retrying")
                 await asyncio.sleep(self.connect_retry_interval)
 
     async def command_loop(self):
