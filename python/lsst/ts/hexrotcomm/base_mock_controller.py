@@ -46,6 +46,8 @@ class BaseMockController(metaclass=abc.ABCMeta):
         Logger.
     config : `ctypes.Structure`
         Configuration data. May be modified.
+    host : `str` (optional)
+        IP address of CSC server.
     telemetry : `ctypes.Structure`
         Telemetry data. Modified by `update_telemetry`.
     command_port : `int` (optional)
@@ -73,6 +75,7 @@ class BaseMockController(metaclass=abc.ABCMeta):
     """Interval between connection retries (sec)."""
 
     def __init__(self, log, config, telemetry,
+                 host=constants.LOCAL_HOST,
                  command_port=constants.COMMAND_PORT,
                  telemetry_port=constants.TELEMETRY_PORT):
         self.log = log.getChild("BaseMockController")
@@ -82,6 +85,7 @@ class BaseMockController(metaclass=abc.ABCMeta):
         # header insteance for each telemetry and config message.
         self.command_port = command_port
         self.telemetry_port = telemetry_port
+        self.host = host
         self.headers = dict()
         for frame_id in (config.FRAME_ID, telemetry.FRAME_ID):
             header = structs.Header()
@@ -194,8 +198,9 @@ class BaseMockController(metaclass=abc.ABCMeta):
             self.command_writer.close()
         while True:
             try:
+                self.log.debug(f"connect_command: connect to host={self.host}, port={self.command_port}")
                 self.command_reader, self.command_writer = \
-                    await asyncio.open_connection(host=constants.LOCAL_HOST, port=self.command_port)
+                    await asyncio.open_connection(host=self.host, port=self.command_port)
                 return
             except Exception as e:
                 self.log.warning(f"connect_command failed with {e}; retrying")
@@ -212,8 +217,9 @@ class BaseMockController(metaclass=abc.ABCMeta):
             self.telemetry_writer.close()
         while True:
             try:
+                self.log.debug(f"connect_telemetry: connect to host={self.host}, port={self.telemetry_port}")
                 self.telemetry_reader, self.telemetry_writer = \
-                    await asyncio.open_connection(host=constants.LOCAL_HOST, port=self.telemetry_port)
+                    await asyncio.open_connection(host=self.host, port=self.telemetry_port)
                 return
             except Exception as e:
                 self.log.warning(f"connect_telemetry failed with {e}; retrying")
