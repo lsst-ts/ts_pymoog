@@ -191,8 +191,12 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         self.assert_commandable()
         if self.summary_state not in allowed_states:
             allowed_states_str = ", ".join(repr(state) for state in allowed_states)
-            msg_prefix = "Must be in state(s)" if isbefore else "Final state"
-            raise salobj.ExpectedError(f"{msg_prefix} {allowed_states_str}, not {self.summary_state!r}")
+            if isbefore:
+                msg_prefix = "Rejected: initial"
+            else:
+                msg_prefix = "Failed: final"
+            raise salobj.ExpectedError(
+                f"{msg_prefix} state is {self.summary_state!r} instead of {allowed_states_str}")
 
     async def run_command(self, cmd, **kwargs):
         command = self.commands[cmd]
