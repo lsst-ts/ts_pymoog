@@ -3,6 +3,7 @@ config.log
 .sconf_temp
 *.cfgc
 *.pyc
+*.log
 
 # Built by sconsUtils
 version.py
