@@ -21,18 +21,15 @@
 __all__ = ["BaseMockController"]
 
 import abc
-import asyncio
-import math
 
-import astropy.time
-
+from lsst.ts.idl.enums import Rotator
 from . import constants
-from . import structs
-from . import utils
+from . import enums
+from . import command_telemetry_client
 
 
-class BaseMockController(metaclass=abc.ABCMeta):
-    """Base class for a mock Moog TCP/IP controller.
+class BaseMockController(command_telemetry_client.CommandTelemetryClient, metaclass=abc.ABCMeta):
+    """Base class for a mock Moog TCP/IP controller with states.
 
     The controller uses two TCP/IP _client_ sockets,
     one to read commands and the other to write telemetry.
@@ -44,16 +41,27 @@ class BaseMockController(metaclass=abc.ABCMeta):
     ----------
     log : `logging.Logger`
         Logger.
+    extra_commands : dict of command key: method
+        Device-specific commands, as a dict of command key (as returned by
+        `get_command_key`): method to call for that command.
+        Note: BaseMockController already supports the standard state
+        transition commands, including CLEAR_ERROR.
+    CommandCode : `enum`
+        Command codes.
     config : `ctypes.Structure`
         Configuration data. May be modified.
     telemetry : `ctypes.Structure`
         Telemetry data. Modified by `update_telemetry`.
+    host : `str` (optional)
+        IP address of CSC server.
     command_port : `int` (optional)
         Command socket port.  This argument is intended for unit tests;
         use the default value for normal operation.
     telemetry_port : `int` (optional)
         Telemetry socket port. This argument is intended for unit tests;
         use the default value for normal operation.
+    initial_state : `lsst.ts.idl.enums.Rotator.ControllerState` (optional)
+        Initial state of mock controller.
 
     Notes
     -----
@@ -72,216 +80,170 @@ class BaseMockController(metaclass=abc.ABCMeta):
     connect_retry_interval = 0.1
     """Interval between connection retries (sec)."""
 
-    def __init__(self, log, config, telemetry,
+    def __init__(self,
+                 log,
+                 CommandCode,
+                 extra_commands,
+                 config,
+                 telemetry,
+                 host=constants.LOCAL_HOST,
                  command_port=constants.COMMAND_PORT,
-                 telemetry_port=constants.TELEMETRY_PORT):
-        self.log = log.getChild("BaseMockController")
-        # A dictionary of frame ID: header for telemetry and config data
-        # Keeping separate headers for telemetry and config allows
-        # updating just the relevant fields, rather than creating a new
-        # header insteance for each telemetry and config message.
-        self.command_port = command_port
-        self.telemetry_port = telemetry_port
-        self.headers = dict()
-        for frame_id in (config.FRAME_ID, telemetry.FRAME_ID):
-            header = structs.Header()
-            header.frame_id = frame_id
-            self.headers[frame_id] = header
-        self.config = config
-        self.telemetry = telemetry
-        self.command_reader = None
-        self.command_writer = None  # not written
-        self.telemetry_reader = None  # not read
-        self.telemetry_writer = None
-        self.command_loop_task = asyncio.Future()
-        self.command_loop_task.set_result(None)
-        self.telemetry_loop_task = asyncio.Future()
-        self.telemetry_loop_task.set_result(None)
-        self.connect_task = asyncio.create_task(self.connect())
+                 telemetry_port=constants.TELEMETRY_PORT,
+                 initial_state=Rotator.ControllerState.OFFLINE):
+        self.CommandCode = CommandCode
+
+        # Dict of command key: command
+        self.command_table = {
+            (CommandCode.SET_STATE, enums.SetStateParam.START): self.do_start,
+            (CommandCode.SET_STATE, enums.SetStateParam.ENABLE): self.do_enable,
+            (CommandCode.SET_STATE, enums.SetStateParam.STANDBY): self.do_standby,
+            (CommandCode.SET_STATE, enums.SetStateParam.DISABLE): self.do_disable,
+            (CommandCode.SET_STATE, enums.SetStateParam.EXIT): self.do_exit,
+            (CommandCode.SET_STATE, enums.SetStateParam.CLEAR_ERROR): self.do_clear_error,
+            (CommandCode.SET_STATE, enums.SetStateParam.ENTER_CONTROL): self.do_enter_control,
+        }
+        self.command_table.update(extra_commands)
+
+        super().__init__(
+            log=log,
+            config=config,
+            telemetry=telemetry,
+            host=host,
+            command_port=command_port,
+            telemetry_port=telemetry_port)
+
+        self.set_state(initial_state)
 
     @property
-    def connected(self):
-        """Return True if command and telemetry sockets are connected.
-        """
-        return self.command_connected and self.telemetry_connected
+    def state(self):
+        return self.telemetry.state
 
     @property
-    def command_connected(self):
-        """Return True if the command socket is connected.
-        """
-        return not (self.command_writer is None or
-                    self.command_writer.is_closing() or
-                    self.command_reader.at_eof())
+    def offline_substate(self):
+        return self.telemetry.offline_substate
 
     @property
-    def telemetry_connected(self):
-        """Return True if the telemetry socket is connected.
-        """
-        return not (self.telemetry_writer is None or
-                    self.telemetry_writer.is_closing() or
-                    self.telemetry_reader.at_eof())
+    def enabled_substate(self):
+        return self.telemetry.enabled_substate
 
-    @abc.abstractmethod
+    def assert_stationary(self):
+        self.assert_state(Rotator.ControllerState.ENABLED,
+                          enabled_substate=Rotator.EnabledSubstate.STATIONARY)
+
+    def get_command_key(self, command):
+        """Return the key to command_table."""
+        if command.cmd in (self.CommandCode.SET_STATE,
+                           self.CommandCode.SET_ENABLED_SUBSTATE):
+            return (command.cmd, int(command.param1))
+        return command.cmd
+
+    def assert_state(self, state, offline_substate=None, enabled_substate=None):
+        if self.state != state:
+            raise RuntimeError(f"state={self.state!r}; must be {state!r} for this command.")
+        if offline_substate is not None and self.offline_substate != offline_substate:
+            raise RuntimeError(f"offline_substate={self.offline_substate!r}; "
+                               f"must be {offline_substate!r} for this command.")
+        if enabled_substate is not None and self.enabled_substate != enabled_substate:
+            raise RuntimeError(f"enabled_substate={self.enabled_substate!r}; "
+                               f"must be {enabled_substate!r} for this command.")
+
+    async def do_enter_control(self, command):
+        self.assert_state(Rotator.ControllerState.OFFLINE,
+                          offline_substate=Rotator.OfflineSubstate.AVAILABLE)
+        self.set_state(Rotator.ControllerState.STANDBY)
+
+    async def do_start(self, command):
+        self.assert_state(Rotator.ControllerState.STANDBY)
+        self.set_state(Rotator.ControllerState.DISABLED)
+
+    async def do_enable(self, command):
+        self.assert_state(Rotator.ControllerState.DISABLED)
+        self.set_state(Rotator.ControllerState.ENABLED)
+
+    async def do_disable(self, command):
+        self.assert_state(Rotator.ControllerState.ENABLED)
+        self.set_state(Rotator.ControllerState.DISABLED)
+
+    async def do_standby(self, command):
+        self.assert_state(Rotator.ControllerState.DISABLED)
+        self.set_state(Rotator.ControllerState.STANDBY)
+
+    async def do_exit(self, command):
+        self.assert_state(Rotator.ControllerState.STANDBY)
+        self.set_state(Rotator.ControllerState.OFFLINE)
+
+    async def do_clear_error(self, command):
+        # Allow initial state FAULT and OFFLINE because the real controller
+        # requires two sequential CLEAR_COMMAND commands. For the mock
+        # controller the first command will (probably) transition from FAULT
+        # to OFFLINE, but the second must be accepted without complaint.
+        if self.state not in (Rotator.ControllerState.FAULT, Rotator.ControllerState.OFFLINE):
+            raise RuntimeError(f"state={self.state!r}; must be FAULT or OFFLINE for this command.")
+        self.set_state(Rotator.ControllerState.OFFLINE)
+
     async def run_command(self, command):
-        """Run a command.
-
-        Parameters
-        ----------
-        command : `Command`
-            Command to execute.
-        """
-        raise NotImplementedError()
+        self.log.debug(f"run_command: "
+                       f"sync_pattern={hex(command.sync_pattern)}; "
+                       f"counter={command.counter}; "
+                       f"command={self.CommandCode(command.cmd)!r}; "
+                       f"param1={command.param1}; "
+                       f"param2={command.param2}; "
+                       f"param3={command.param3}; "
+                       f"param4={command.param4}; "
+                       f"param5={command.param5}; "
+                       f"param6={command.param6}")
+        key = self.get_command_key(command)
+        cmd_method = self.command_table.get(key, None)
+        if cmd_method is None:
+            self.log.error(f"Unrecognized command cmd={command.cmd}; param1={command.param1}")
+            return
+        try:
+            await cmd_method(command)
+        except Exception as e:
+            self.log.error(f"Command cmd={command.cmd}; param1={command.param1} failed: {e}")
+        await self.end_run_command(command=command, cmd_method=cmd_method)
 
     @abc.abstractmethod
-    def update_telemetry(self):
-        """Update self.telemetry with current values.
+    async def end_run_command(self, command, cmd_method):
+        """Called when run_command is done.
+
+        Can be used to clear the set position.
         """
         raise NotImplementedError()
 
-    async def close(self):
-        """Kill command and telemetry tasks and close the connections.
-
-        Always safe to call.
-        """
-        self.log.debug(f"close()")
-        self.connect_task.cancel()
-        self._basic_close()
-        self.command_reader = None
-        self.command_writer = None
-        self.telemetry_reader = None
-        self.telemetry_writer = None
-
-    def _basic_close(self):
-        """Halt command and telemetry loops and close the connections.
-        """
-        self.command_loop_task.cancel()
-        self.telemetry_loop_task.cancel()
-        if self.command_connected:
-            self.command_writer.close()
-        if self.telemetry_connected:
-            self.telemetry_writer.close()
-
-    async def connect(self):
-        """Connect the sockets.
-
-        Notes
-        -----
-        This will wait forever for a connection.
-        """
-        self.log.info("connect")
-        self._basic_close()
-        self.log.debug("connect: making connections")
-        coroutines = []
-        if self.command_reader is None:
-            coroutines.append(self.connect_command())
-        if self.telemetry_writer is None:
-            coroutines.append(self.connect_telemetry())
-        if coroutines:
-            await asyncio.gather(*coroutines)
-
-        self.log.debug("connect: starting command and telemetry loops")
-        self.command_loop_task = asyncio.create_task(self.command_loop())
-        self.telemetry_loop_task = asyncio.create_task(self.telemetry_loop())
-
-    async def connect_command(self):
-        """Connect or reconnect to the command socket.
-
-        Notes
-        -----
-        This will wait forever for a connection.
-        """
-        if self.command_writer is not None and not self.command_writer.is_closing():
-            self.command_writer.close()
-        while True:
-            try:
-                self.command_reader, self.command_writer = \
-                    await asyncio.open_connection(host=constants.LOCAL_HOST, port=self.command_port)
-                return
-            except Exception:
-                self.log.exception("connect_command failed; retrying")
-                await asyncio.sleep(self.connect_retry_interval)
-
-    async def connect_telemetry(self):
-        """Connect or reconnect to the telemetry/configuration socket.
-
-        Notes
-        -----
-        This will wait forever for a connection.
-        """
-        if self.telemetry_writer is not None and not self.telemetry_writer.is_closing():
-            self.telemetry_writer.close()
-        while True:
-            try:
-                self.telemetry_reader, self.telemetry_writer = \
-                    await asyncio.open_connection(host=constants.LOCAL_HOST, port=self.telemetry_port)
-                return
-            except Exception:
-                self.log.exception("connect_telemetry failed; retrying")
-                await asyncio.sleep(self.connect_retry_interval)
-
-    async def command_loop(self):
-        """Read and execute commands.
-        """
-        self.log.info("command_loop begins")
-        while self.command_reader is not None:
-            try:
-                command = structs.Command()
-                await utils.read_into(self.command_reader, command)
-                await self.run_command(command)
-            except asyncio.CancelledError:
-                raise
-            except ConnectionError:
-                self.log.error("Command socket closed; reconnecting")
-                asyncio.ensure_future(self.connect_command())
-                raise
-            except Exception:
-                self.log.exception("command_loop failed; reconnecting")
-                # disconnect and try again
-                asyncio.ensure_future(self.connect_command())
-                raise
-
-    async def telemetry_loop(self):
-        """Write configuration once, then telemetry at regular intervals.
-        """
-        self.log.info("telemetry_loop begins")
-        try:
-            await self.write_config()
-            while self.telemetry_connected:
-                header = self.update_and_get_header(self.telemetry.FRAME_ID)
-                await self.update_telemetry()
-                await utils.write_from(self.telemetry_writer, header, self.telemetry)
-                await asyncio.sleep(self.telemetry_interval)
-            self.log.warning("Telemetry socket disconnected; reconnecting")
-            asyncio.ensure_future(self.connect_telemetry())
-        except asyncio.CancelledError:
-            pass
-        except Exception:
-            self.log.exception("telemetry_loop failed; reconnecting")
-            asyncio.ensure_future(self.connect_telemetry())
-
-    async def write_config(self):
-        """Write the current configuration.
-        """
-        assert self.telemetry_writer is not None
-        header = self.update_and_get_header(self.config.FRAME_ID)
-        await utils.write_from(self.telemetry_writer, header, self.config)
-
-    def update_and_get_header(self, frame_id):
-        """Update the config or telemetry header and return it.
-
-        Call this prior to writing telemetry or configuration.
+    def set_state(self, state):
+        """Set the current state and substates.
 
         Parameters
         ----------
-        frame_id : `int`
-            Frame ID of header to write.
+        state : `lsst.ts.idl.enums.Rotator.ControllerState` or `int`
+            New state.
+
+        Notes
+        -----
+        Sets the substates as follows:
+
+        * `lsst.ts.idl.enums.Rotator.OfflineSubstate.AVAILABLE`
+          if state == `lsst.ts.idl.enums.Rotator.ControllerState.OFFLINE`
+        * `lsst.ts.idl.enums.Rotator.EnabledSubstate.STATIONARY`
+          if state == `lsst.ts.idl.enums.Rotator.ControllerState.ENABLED`
+
+        The real controller goes to substate
+        `lsst.ts.idl.enums.Rotator.OfflineSubstate.PUBLISH_ONLY` when going
+        offline, but requires the engineering user interface (EUI) to get out
+        of that state, and we don't have an EUI for the mock controller!
         """
-        header = self.headers[frame_id]
-        curr_time = astropy.time.Time.now()
-        mjd_frac, mjd_days = math.modf(curr_time.utc.mjd)
-        header.mjd = int(mjd_days)
-        header.mjd_frac = mjd_frac
-        unix_frac, unix_sec = math.modf(curr_time.utc.unix)
-        header.tv_sec = int(unix_sec)
-        header.tv_nsec = int(unix_frac * 1e9)
-        return header
+        self.telemetry.state = Rotator.ControllerState(state)
+        self.telemetry.offline_substate = Rotator.OfflineSubstate.AVAILABLE \
+            if self.telemetry.state == Rotator.ControllerState.OFFLINE else 0
+        self.telemetry.enabled_substate = Rotator.EnabledSubstate.STATIONARY \
+            if self.telemetry.state == Rotator.ControllerState.ENABLED else 0
+        self.log.debug(f"set_state: state={Rotator.ControllerState(self.telemetry.state)!r}; "
+                       f"offline_substate={Rotator.OfflineSubstate(self.telemetry.offline_substate)}; "
+                       f"enabled_substate={Rotator.EnabledSubstate(self.telemetry.enabled_substate)}")
+
+    @abc.abstractmethod
+    async def update_telemetry(self):
+        """Update self.client.telemetry.
+        """
+        raise NotImplementedError()

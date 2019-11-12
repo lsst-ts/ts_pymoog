@@ -1,4 +1,4 @@
-# This file is part of ts_hexrotcomm.
+# This file is part of ts_hexapod.
 #
 # Developed for the LSST Data Management System.
 # This product includes software developed by the LSST Project
@@ -19,21 +19,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from .constants import *
-from .enums import *
-from .structs import *
-from .utils import *
-from .csc_commander import *
-from .one_client_server import *
-from .command_telemetry_client import *
-from .command_telemetry_server import *
-from .base_mock_controller import *
-from .simple_mock_controller import *
-from .base_csc import *
-from .simple_csc import *
-from .base_csc_test_case import *
+__all__ = ["SetStateParam"]
 
-try:
-    from .version import *
-except ImportError:
-    __version__ = "?"
+import enum
+
+
+class SetStateParam(enum.IntEnum):
+    """Values for ``command.param1`` when
+    ``command.cmd = CommandCode.SET_STATE``.
+
+    Called ``TriggerCmds`` in Moog code.
+    """
+    INVALID = 0
+    START = enum.auto()
+    ENABLE = enum.auto()
+    STANDBY = enum.auto()
+    DISABLE = enum.auto()
+    EXIT = enum.auto()
+    CLEAR_ERROR = enum.auto()
+    ENTER_CONTROL = enum.auto()

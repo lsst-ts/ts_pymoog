@@ -18,17 +18,25 @@
 #
 # You should have received a copy of the GNU General Public License
 
-__all__ = ["SimpleCommandType", "SimpleConfig", "SimpleTelemetry", "SimpleMockController"]
+__all__ = ["SIMPLE_SYNC_PATTERN", "SimpleCommandCode", "SimpleConfig", "SimpleTelemetry",
+           "SimpleMockController"]
 
 import ctypes
 import enum
 
+from lsst.ts.idl.enums import Rotator
+from . import constants
 from . import base_mock_controller
 
 
-class SimpleCommandType(enum.IntEnum):
-    SET_POSITION = 1
-    CONFIG_MIN_MAX_POSITION = 2
+SIMPLE_SYNC_PATTERN = 0x1234
+
+
+class SimpleCommandCode(enum.IntEnum):
+    SET_STATE = 1
+    SET_ENABLED_SUBSTATE = enum.auto()
+    POSITION_SET = enum.auto()
+    CONFIG_VEL = enum.auto()
 
 
 class SimpleConfig(ctypes.Structure):
@@ -38,6 +46,7 @@ class SimpleConfig(ctypes.Structure):
     _fields_ = [
         ("min_position", ctypes.c_double),
         ("max_position", ctypes.c_double),
+        ("max_velocity", ctypes.c_double),
     ]
     FRAME_ID = 0x19
 
@@ -47,8 +56,12 @@ class SimpleTelemetry(ctypes.Structure):
     """
     _pack_ = 1
     _fields_ = [
-        ("position", ctypes.c_double),
-        ("seq_num", ctypes.c_uint),
+        ("application_status", ctypes.c_uint),
+        ("state", ctypes.c_double),
+        ("enabled_substate", ctypes.c_double),
+        ("offline_substate", ctypes.c_double),
+        ("curr_position", ctypes.c_double),
+        ("cmd_position", ctypes.c_double),
     ]
     FRAME_ID = 0x5
 
@@ -56,14 +69,15 @@ class SimpleTelemetry(ctypes.Structure):
 class SimpleMockController(base_mock_controller.BaseMockController):
     """Simple mock controller for unit testing BaseMockController.
 
+    The POSITION_SET command sets cmd_position and curr_position,
+    then the controller slowly increments curr_position.
+
     Parameters
     ----------
     log : `logging.Logger`
         Logger.
-    config : `SimpleConfig`
-        Initial configuration. Updated by the ``SET_POSITION`` command.
-    telemetry : `SimpleTelemetry`
-        Initial telemetry. Updated at regular intervals.
+    host : `str` (optional)
+        IP address of server.
     command_port : `int` (optional)
         Command socket port.  This argument is intended for unit tests;
         use the default value for normal operation.
@@ -73,39 +87,58 @@ class SimpleMockController(base_mock_controller.BaseMockController):
 
     Notes
     -----
-    The ``SET_POSITION`` command is rejected if the new position is
+    The ``POSITION_SET`` command is rejected if the new position is
     not within the configured limits.
-
-    The ``CONFIG_MIN_MAX_POSITION`` command is rejected if
-    ``min_position <= max_position``. The new limits do not affect
-    the current position, even if it is out of range.
     """
-    async def run_command(self, command):
-        """Run a command.
+    def __init__(self,
+                 log,
+                 host=constants.LOCAL_HOST,
+                 command_port=constants.COMMAND_PORT,
+                 telemetry_port=constants.TELEMETRY_PORT,
+                 initial_state=Rotator.ControllerState.OFFLINE):
+        config = SimpleConfig()
+        config.min_position = -25
+        config.max_position = 25
+        config.max_velocity = 47
+        telemetry = SimpleTelemetry()
+        extra_commands = {
+            SimpleCommandCode.POSITION_SET: self.do_position_set,
+            SimpleCommandCode.CONFIG_VEL: self.do_config_velocity,
+        }
+        super().__init__(
+            log=log,
+            CommandCode=SimpleCommandCode,
+            extra_commands=extra_commands,
+            config=config,
+            telemetry=telemetry,
+            host=host,
+            command_port=command_port,
+            telemetry_port=telemetry_port,
+            initial_state=initial_state,
+        )
 
-        Parameters
-        ----------
-        command : `Command`
-            Command to execute.
-        """
-        self.log.debug(r"run_command; cmd=%s", command.cmd)
-        if command.cmd == SimpleCommandType.SET_POSITION:
-            position = command.param1
-            if self.config.min_position <= position <= self.config.max_position:
-                self.telemetry.position = position
-            else:
-                self.log.error("Commanded position out of range; ignoring the command.")
-        elif command.cmd == SimpleCommandType.CONFIG_MIN_MAX_POSITION:
-            min_position = command.param1
-            max_position = command.param2
-            if min_position < max_position:
-                self.config.min_position = min_position
-                self.config.max_position = max_position
-                await self.write_config()
-            else:
-                self.log.error("Commanded configuration not valid; ignoring the command.")
+    async def do_config_velocity(self, command):
+        self.assert_state(Rotator.ControllerState.ENABLED)
+        max_velocity = command.param1
+        if max_velocity > 0:
+            self.config.max_velocity = max_velocity
+            await self.write_config()
         else:
-            self.log.error(f"Unknown command {command.cmd}; ignoring the command.")
+            self.log.error(f"Commanded max velocity {max_velocity} <= 0; ignoring the command.")
+
+    async def do_position_set(self, command):
+        self.assert_state(Rotator.ControllerState.ENABLED)
+        position = command.param1
+        if self.config.min_position <= position <= self.config.max_position:
+            self.telemetry.cmd_position = position
+            self.telemetry.curr_position = position
+        else:
+            self.log.error(f"Commanded position {position} out of range "
+                           f"[{self.config.min_position}, {self.config.max_position}]; ignoring the command.")
 
     async def update_telemetry(self):
-        self.telemetry.seq_num += 1
+        self.telemetry.application_status = Rotator.ApplicationStatus.DDS_COMMAND_SOURCE
+        self.telemetry.curr_position += 0.001
+
+    async def end_run_command(self, **kwargs):
+        pass

@@ -6,7 +6,7 @@
 lsst.ts.hexrotcomm
 ##################
 
-Python code to communicate with the main telescope camera rotator and hexapod low level controllers (which run in cRIOs) written by Moog, plus a base class for mock controllers.
+Python code to communicate with the main telescope camera rotator and hexapod low level controllers (code running in CompactRIO computers).
 
 .. _lsst.ts.hexrotcomm-using:
 

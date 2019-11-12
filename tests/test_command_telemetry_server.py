@@ -25,6 +25,7 @@ import unittest
 
 import asynctest
 
+from lsst.ts.idl.enums import Rotator
 from lsst.ts import hexrotcomm
 
 # Standard timeout for TCP/IP messages (sec).
@@ -38,10 +39,6 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
     """Test CommandTelemetryServer by connecting it to a SimpleMockController.
     """
     async def setUp(self):
-        self.initial_position = 73
-        self.initial_min_position = -102
-        self.initial_max_position = 101
-
         # Queue of (command_connected, telemetry_connected) filled by
         # the self.connect_callback
         self.connect_queue = asyncio.Queue()
@@ -89,20 +86,18 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         """
         if check_connected:
             await self.assert_next_connected(command=False, telemetry=False)
-        config = hexrotcomm.SimpleConfig()
-        config.min_position = self.initial_min_position
-        config.max_position = self.initial_max_position
-        telemetry = hexrotcomm.SimpleTelemetry()
-        telemetry.position = self.initial_position
         self.mock_ctrl = hexrotcomm.SimpleMockController(log=self.server.log,
-                                                         config=config,
-                                                         telemetry=telemetry,
                                                          command_port=self.server.command_port,
-                                                         telemetry_port=self.server.telemetry_port)
+                                                         telemetry_port=self.server.telemetry_port,
+                                                         initial_state=Rotator.ControllerState.ENABLED)
         await self.mock_ctrl.connect_task
         await self.server.wait_connected()
         if check_connected:
             await self.assert_next_connected(command=True, telemetry=True, skip=1)
+        self.initial_min_position = self.mock_ctrl.config.min_position
+        self.initial_max_position = self.mock_ctrl.config.max_position
+        self.initial_max_velocity = self.mock_ctrl.config.max_velocity
+        self.initial_cmd_position = self.mock_ctrl.telemetry.cmd_position
 
     def connect_callback(self, server):
         print(f"connect_callback: command_connected={server.command_connected}, "
@@ -189,8 +184,8 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         self.assertEqual(config.max_position, self.initial_max_position)
         telemetry = await self.server.next_telemetry()
         await self.assert_connected(command=True, telemetry=True)
-        self.assertEqual(telemetry.position, self.initial_position)
-        self.assertGreaterEqual(telemetry.seq_num, 1)
+        self.assertEqual(telemetry.cmd_position, self.initial_cmd_position)
+        self.assertGreaterEqual(telemetry.curr_position, self.initial_cmd_position)
 
         # extra calls to server.start should fail
         with self.assertRaises(RuntimeError):
@@ -207,27 +202,30 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         await self.assert_next_connected(command=True, telemetry=False)
         await self.assert_next_connected(command=True, telemetry=True, timeout=RECONNECT_TIMEOUT)
 
-    async def test_set_position_command(self):
+    async def test_position_set_command(self):
         await self.make_controller()
         config = await self.next_config()
         self.assertEqual(config.min_position, self.initial_min_position)
         self.assertEqual(config.max_position, self.initial_max_position)
-        await self.server.next_telemetry()
+        telemetry = await self.server.next_telemetry()
+        self.assertEqual(telemetry.cmd_position, self.initial_cmd_position)
 
         for good_position in (
             self.initial_min_position,
             self.initial_max_position,
             (self.initial_min_position + self.initial_max_position) / 2,
         ):
-            await self.check_set_position(cmd_position=good_position)
+            with self.subTest(good_position=good_position):
+                await self.check_position_set(cmd_position=good_position)
         last_good_position = good_position
 
         for bad_position in (
             self.initial_min_position - 0.001,
             self.initial_max_position + 0.001,
         ):
-            await self.check_set_position(cmd_position=bad_position,
-                                          desired_position=last_good_position)
+            with self.subTest(bad_position=bad_position):
+                await self.check_position_set(cmd_position=bad_position,
+                                              desired_position=last_good_position)
 
         # set position commands should not trigger configuration output.
         with self.assertRaises(asyncio.TimeoutError):
@@ -250,7 +248,7 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         """Test expected failures in CommandTelemetryServer.put_command.
         """
         command = hexrotcomm.Command()
-        command.cmd = hexrotcomm.SimpleCommandType.SET_POSITION
+        command.cmd = hexrotcomm.SimpleCommandCode.POSITION_SET
         command.param1 = 0
 
         # Should fail if not connected
@@ -337,34 +335,21 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         with self.assertRaises(asyncio.TimeoutError):
             await asyncio.wait_for(self.connect_queue.get(), timeout=STD_TIMEOUT)
 
-    async def test_config_min_max_position_command(self):
+    async def test_config_velocity(self):
         await self.make_controller()
         await self.server.next_telemetry()
         config = await self.next_config()
-        self.assertEqual(config.min_position, self.initial_min_position)
-        self.assertEqual(config.max_position, self.initial_max_position)
+        self.assertEqual(config.max_velocity, self.initial_max_velocity)
 
-        # Check valid limits (min < max).
-        for good_min_position, good_max_position in (
-            (-56.001, -56),
-            (200, 200.001),
-            (-105, 63),
-        ):
-            await self.check_config_min_max_position_command(min_position=good_min_position,
-                                                             max_position=good_max_position)
+        # Check valid limits
+        for good_max_velocity in (0.0001, 15):
+            await self.check_config_velocity(good_max_velocity)
 
         # Check invalid limits (min >= max).
-        for bad_min_position, bad_max_position in (
-            (-56, -56),
-            (-56, -56.001),
-            (200, 200),
-            (200.001, 200),
-            (47, -3.14),
-        ):
-            await self.check_config_min_max_position_command(min_position=bad_min_position,
-                                                             max_position=bad_max_position)
+        for bad_max_velocity in (-1, -0.001, 0):
+            await self.check_config_velocity(bad_max_velocity)
 
-    async def check_set_position(self, cmd_position, desired_position=None):
+    async def check_position_set(self, cmd_position, desired_position=None):
         """Command a position and check the result.
 
         If the commanded position is in bounds then the telemetry
@@ -379,30 +364,26 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
             Desired position. If None then use ``cmd_position``
 
         """
-        initial_seq_num = self.telemetry_list[-1].seq_num
         if desired_position is None:
             desired_position = cmd_position
 
         command = hexrotcomm.Command()
-        command.cmd = hexrotcomm.SimpleCommandType.SET_POSITION
+        command.cmd = hexrotcomm.SimpleCommandCode.POSITION_SET
         command.param1 = cmd_position
         await self.server.put_command(command)
 
         telemetry = await self.server.next_telemetry()
-        self.assertEqual(telemetry.position, desired_position)
-        self.assertGreater(telemetry.seq_num, initial_seq_num)
+        self.assertEqual(telemetry.cmd_position, desired_position)
 
-    async def check_config_min_max_position_command(self, min_position, max_position):
+    async def check_config_velocity(self, max_velocity):
         command = hexrotcomm.Command()
-        command.cmd = hexrotcomm.SimpleCommandType.CONFIG_MIN_MAX_POSITION
-        command.param1 = min_position
-        command.param2 = max_position
+        command.cmd = hexrotcomm.SimpleCommandCode.CONFIG_VEL
+        command.param1 = max_velocity
         await self.server.put_command(command)
 
-        if min_position < max_position:
+        if max_velocity > 0:
             config = await self.next_config()
-            self.assertEqual(config.min_position, min_position)
-            self.assertEqual(config.max_position, max_position)
+            self.assertEqual(config.max_velocity, max_velocity)
         else:
             with self.assertRaises(asyncio.TimeoutError):
                 await self.next_config()
