@@ -226,10 +226,10 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         """
         self.assert_summary_state(salobj.State.FAULT, isbefore=True)
         # Two sequential commands are needed to clear error
-        await self.run_command(cmd=enums.CommandCode.SET_STATE,
+        await self.run_command(cmd=self.CommandCode.SET_STATE,
                                param1=enums.SetStateParam.CLEAR_ERROR)
         await asyncio.sleep(0.9)
-        await self.run_command(cmd=enums.CommandCode.SET_STATE,
+        await self.run_command(cmd=self.CommandCode.SET_STATE,
                                param1=enums.SetStateParam.CLEAR_ERROR)
         await self.server.next_telemetry()
         self.assert_summary_state(salobj.State.OFFLINE, isbefore=False)
