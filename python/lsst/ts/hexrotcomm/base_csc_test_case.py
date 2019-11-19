@@ -249,17 +249,6 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
                 with salobj.assertRaisesAckError(ack=salobj.SalRetCode.CMD_FAILED):
                     await cmd_attr.start(timeout=STD_TIMEOUT)
 
-    async def test_clear_error(self):
-        await self.make_csc(initial_state=salobj.State.FAULT)
-        await self.assert_next_summary_state(salobj.State.FAULT)
-        await self.remote.cmd_clearError.start(timeout=STD_TIMEOUT)
-        # Note: the vendor's low level controller code goes to state=OFFLINE
-        # offlineSubstate=PUBLISH_ONLY, which requires the Engineering User
-        # Interface to restore control to the CSC.
-        # The mock controller goes to state=OFFLINE
-        # offlineSubstate=PUBLISH_ONLY to avoid this issue.
-        await self.assert_next_summary_state(salobj.State.OFFLINE)
-
     async def test_initial_state_offline(self):
         await self.check_initial_state(salobj.State.OFFLINE)
 
