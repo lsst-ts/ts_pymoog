@@ -103,7 +103,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         self.assert_enabled_substate(Rotator.EnabledSubstate.STATIONARY)
         if data.vlimit <= 0:
             raise salobj.ExpectedError(f"vlimit={data.vlimit} must be > 0")
-        await self.run_command(cmd=simple_mock_controller.SimpleCommandCode.CONFIG_VEL,
+        await self.run_command(code=simple_mock_controller.SimpleCommandCode.CONFIG_VEL,
                                param1=data.vlimit)
 
     async def do_positionSet(self, data):
@@ -114,7 +114,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
             raise salobj.ExpectedError(f"angle {data.angle} not in range "
                                        f"[{self.server.config.min_position}, "
                                        f"{self.server.config.max_position}]")
-        await self.run_command(cmd=simple_mock_controller.SimpleCommandCode.POSITION_SET,
+        await self.run_command(code=simple_mock_controller.SimpleCommandCode.POSITION_SET,
                                param1=data.angle)
 
     async def do_configureAcceleration(self, data):

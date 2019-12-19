@@ -199,21 +199,21 @@ class CommandTelemetryServer:
                 break
         await self.telemetry_server.close_client()
 
-    async def put_command(self, cmd):
+    async def put_command(self, command):
         """Write a command to the controller.
 
         Parameters
         ----------
-        cmd : `Command`
+        command : `Command`
             Command to write.
         """
         if not self.start_task.done():
             raise RuntimeError("CommandTelemetryServer not ready.")
         if not self.command_connected:
             raise RuntimeError("No command writer")
-        if not isinstance(cmd, structs.Command):
-            raise ValueError(f"cmd={cmd!r} must be an instance of structs.Command")
-        await utils.write_from(self.command_server.writer, cmd)
+        if not isinstance(command, structs.Command):
+            raise ValueError(f"command={command!r} must be an instance of structs.Command")
+        await utils.write_from(self.command_server.writer, command)
 
     async def monitor_command_reader(self):
         """Monitor the command reader; if it closes then close the writer.

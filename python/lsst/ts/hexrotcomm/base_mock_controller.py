@@ -129,10 +129,10 @@ class BaseMockController(command_telemetry_client.CommandTelemetryClient, metacl
 
     def get_command_key(self, command):
         """Return the key to command_table."""
-        if command.cmd in (self.CommandCode.SET_STATE,
-                           self.CommandCode.SET_ENABLED_SUBSTATE):
-            return (command.cmd, int(command.param1))
-        return command.cmd
+        if command.code in (self.CommandCode.SET_STATE,
+                            self.CommandCode.SET_ENABLED_SUBSTATE):
+            return (command.code, int(command.param1))
+        return command.code
 
     def assert_state(self, state, offline_substate=None, enabled_substate=None):
         if self.state != state:
@@ -182,7 +182,7 @@ class BaseMockController(command_telemetry_client.CommandTelemetryClient, metacl
         self.log.debug(f"run_command: "
                        f"sync_pattern={hex(command.sync_pattern)}; "
                        f"counter={command.counter}; "
-                       f"command={self.CommandCode(command.cmd)!r}; "
+                       f"command={self.CommandCode(command.code)!r}; "
                        f"param1={command.param1}; "
                        f"param2={command.param2}; "
                        f"param3={command.param3}; "
@@ -192,12 +192,12 @@ class BaseMockController(command_telemetry_client.CommandTelemetryClient, metacl
         key = self.get_command_key(command)
         cmd_method = self.command_table.get(key, None)
         if cmd_method is None:
-            self.log.error(f"Unrecognized command cmd={command.cmd}; param1={command.param1}")
+            self.log.error(f"Unrecognized command code {command.code}; param1={command.param1}...")
             return
         try:
             await cmd_method(command)
         except Exception as e:
-            self.log.error(f"Command cmd={command.cmd}; param1={command.param1} failed: {e}")
+            self.log.error(f"Command code {command.code}; param1={command.param1}... failed: {e}")
         await self.end_run_command(command=command, cmd_method=cmd_method)
 
     @abc.abstractmethod
