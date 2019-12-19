@@ -26,10 +26,11 @@ import asyncio
 import sys
 
 from lsst.ts import salobj
-from lsst.ts import hexrotcomm
 from lsst.ts.idl.enums import Rotator
 from . import enums
 from . import constants
+from . import structs
+from . import command_telemetry_server
 
 
 # Dict of controller state: CSC state.
@@ -115,7 +116,7 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         # with constants set to suitable values.
         self.commands = dict()
         for cmd in CommandCode:
-            command = hexrotcomm.Command()
+            command = structs.Command()
             command.cmd = cmd
             command.sync_pattern = sync_pattern
             self.commands[cmd] = command
@@ -136,7 +137,7 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         await super().start()
         simulating = self.simulation_mode != 0
         host = constants.LOCAL_HOST if simulating else None
-        self.server = hexrotcomm.CommandTelemetryServer(
+        self.server = command_telemetry_server.CommandTelemetryServer(
             host=host,
             log=self.log,
             ConfigClass=self.ConfigClass,
