@@ -74,9 +74,6 @@ class BaseMockController(command_telemetry_client.CommandTelemetryClient, metacl
 
         await ctrl.stop()
     """
-    telemetry_interval = 0.1
-    """Interval between telemetry messages (sec)."""
-
     connect_retry_interval = 0.1
     """Interval between connection retries (sec)."""
 
