@@ -34,36 +34,20 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
     def basic_make_csc(self, initial_state=salobj.State.OFFLINE, simulation_mode=1):
         return hexrotcomm.SimpleCsc(initial_state=initial_state, simulation_mode=simulation_mode)
 
-    async def test_configure_velocity(self):
-        """Test the configureVelocity command.
-        """
-        await self.make_csc(initial_state=salobj.State.ENABLED)
-        data = await self.remote.evt_settingsApplied.next(flush=False, timeout=STD_TIMEOUT)
-        initial_limit = data.velocityLimit
-        new_limit = initial_limit - 0.1
-        await self.remote.cmd_configureVelocity.set_start(vlimit=new_limit, timeout=STD_TIMEOUT)
-        data = await self.remote.evt_settingsApplied.next(flush=False, timeout=STD_TIMEOUT)
-        self.assertAlmostEqual(data.velocityLimit, new_limit)
-
-        for bad_vlimit in (0, -1):
-            with self.subTest(bad_vlimit=bad_vlimit):
-                with salobj.assertRaisesAckError(ack=salobj.SalRetCode.CMD_FAILED):
-                    await self.remote.cmd_configureVelocity.set_start(vlimit=bad_vlimit, timeout=STD_TIMEOUT)
-
-    async def test_positionSet(self):
-        """Test the positionSet command.
+    async def test_move(self):
+        """Test the move command.
         """
         destination = 2  # a small move so the test runs quickly
         await self.make_csc(initial_state=salobj.State.ENABLED)
         await self.assert_next_controller_state(controllerState=Rotator.ControllerState.ENABLED)
         data = await self.remote.tel_Application.next(flush=True, timeout=STD_TIMEOUT)
         self.assertAlmostEqual(data.Demand, 0)
-        await self.remote.cmd_positionSet.set_start(angle=destination, timeout=STD_TIMEOUT)
+        await self.remote.cmd_move.set_start(position=destination, timeout=STD_TIMEOUT)
         data = await self.remote.tel_Application.next(flush=True, timeout=STD_TIMEOUT)
         self.assertAlmostEqual(data.Demand, destination)
 
     async def test_standard_state_transitions(self):
-        await self.check_standard_state_transitions(enabled_commands=("configureVelocity", "positionSet"))
+        await self.check_standard_state_transitions(enabled_commands=("move",))
 
 
 if __name__ == "__main__":

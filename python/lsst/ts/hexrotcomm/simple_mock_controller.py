@@ -35,8 +35,7 @@ SIMPLE_SYNC_PATTERN = 0x1234
 class SimpleCommandCode(enum.IntEnum):
     SET_STATE = 1
     SET_ENABLED_SUBSTATE = enum.auto()
-    POSITION_SET = enum.auto()
-    CONFIG_VEL = enum.auto()
+    MOVE = enum.auto()
 
 
 class SimpleConfig(ctypes.Structure):
@@ -69,7 +68,7 @@ class SimpleTelemetry(ctypes.Structure):
 class SimpleMockController(base_mock_controller.BaseMockController):
     """Simple mock controller for unit testing BaseMockController.
 
-    The POSITION_SET command sets cmd_position and curr_position,
+    The MOVE command sets cmd_position and curr_position,
     then the controller slowly increments curr_position.
 
     Parameters
@@ -87,7 +86,7 @@ class SimpleMockController(base_mock_controller.BaseMockController):
 
     Notes
     -----
-    The ``POSITION_SET`` command is rejected if the new position is
+    The ``MOVE`` command is rejected if the new position is
     not within the configured limits.
     """
     def __init__(self,
@@ -102,8 +101,7 @@ class SimpleMockController(base_mock_controller.BaseMockController):
         config.max_velocity = 47
         telemetry = SimpleTelemetry()
         extra_commands = {
-            SimpleCommandCode.POSITION_SET: self.do_position_set,
-            SimpleCommandCode.CONFIG_VEL: self.do_config_velocity,
+            SimpleCommandCode.MOVE: self.do_position_set,
         }
         super().__init__(
             log=log,

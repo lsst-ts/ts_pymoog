@@ -32,7 +32,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
 
     This is based on the Rotator CSC but only supports a small subset
     off commands, events and telemetry. See Notes for details.
-    The positionSet command sets the cmd_position and curr_position
+    The move command sets the cmd_position and curr_position
     telemetry fields, then the controller slowly increments curr_position.
 
     Parameters
@@ -57,8 +57,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     Supported commands:
 
     * All standard state transition commands and clearError
-    * configureVelocity
-    * positionSet
+    * move
 
     Supported events:
 
@@ -97,48 +96,30 @@ class SimpleCsc(hexrotcomm.BaseCsc):
                          initial_state=initial_state,
                          simulation_mode=simulation_mode)
 
-    async def do_configureVelocity(self, data):
-        """Specify the velocity limit.
-        """
-        self.assert_enabled_substate(Rotator.EnabledSubstate.STATIONARY)
-        if data.vlimit <= 0:
-            raise salobj.ExpectedError(f"vlimit={data.vlimit} must be > 0")
-        await self.run_command(code=simple_mock_controller.SimpleCommandCode.CONFIG_VEL,
-                               param1=data.vlimit)
-
-    async def do_positionSet(self, data):
+    async def do_move(self, data):
         """Specify a position.
         """
         self.assert_enabled_substate(Rotator.EnabledSubstate.STATIONARY)
-        if not self.server.config.min_position <= data.angle <= self.server.config.max_position:
-            raise salobj.ExpectedError(f"angle {data.angle} not in range "
+        if not self.server.config.min_position <= data.position <= self.server.config.max_position:
+            raise salobj.ExpectedError(f"position {data.position} not in range "
                                        f"[{self.server.config.min_position}, "
                                        f"{self.server.config.max_position}]")
-        await self.run_command(code=simple_mock_controller.SimpleCommandCode.POSITION_SET,
-                               param1=data.angle)
+        await self.run_command(code=simple_mock_controller.SimpleCommandCode.MOVE,
+                               param1=data.position)
 
     async def do_configureAcceleration(self, data):
         raise salobj.ExpectedError("Not implemented")
 
-    async def do_move(self, data):
-        raise salobj.ExpectedError("Not implemented")
-
-    async def do_moveConstantVelocity(self, data):
+    async def do_configureVelocity(self, data):
         raise salobj.ExpectedError("Not implemented")
 
     async def do_stop(self, data):
-        raise salobj.ExpectedError("Not implemented")
-
-    async def do_test(self, data):
         raise salobj.ExpectedError("Not implemented")
 
     async def do_track(self, data):
         raise salobj.ExpectedError("Not implemented")
 
     async def do_trackStart(self, data):
-        raise salobj.ExpectedError("Not implemented")
-
-    async def do_velocitySet(self, data):
         raise salobj.ExpectedError("Not implemented")
 
     def config_callback(self, server):
@@ -149,7 +130,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         server : `CommandTelemetryServer`
             TCP/IP server.
         """
-        self.evt_settingsApplied.set_put(
+        self.evt_configuration.set_put(
             positionAngleUpperLimit=server.config.max_position,
             velocityLimit=server.config.max_velocity,
             accelerationLimit=0,

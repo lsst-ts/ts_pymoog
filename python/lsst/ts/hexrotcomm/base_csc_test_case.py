@@ -178,8 +178,9 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
         ----------
         enabled_commands : `List` [`str`]
             List of commands that are valid in the enabled/stationary state,
-            for example ("configureVelocity", "configureAcceleration").
-            Need not include standard commands "disable" and "setLogLevel".
+            for example ("move", "stop").
+            Need not include the standard commands, which are "disable"
+            and "setLogLevel".
         """
         await self.make_csc(initial_state=salobj.State.OFFLINE)
         await self.assert_next_summary_state(salobj.State.OFFLINE)
