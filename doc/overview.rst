@@ -8,7 +8,7 @@ ts_hexrotcomm Overview
 Introduction
 ============
 
-Python code to communicate with the main telescope camera rotator and hexapod low level controllers (code running in CompactRIO computers).
+Python code to communicate with the main telescope camera rotator and hexapod low level controllers (code running in PXI computers).
 Note that these controller use a rather strange :ref:`communication protocol <communication_protocol>`.
 Contents include:
 
