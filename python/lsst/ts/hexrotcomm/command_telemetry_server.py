@@ -75,6 +75,10 @@ class CommandTelemetryServer:
         self.config_callback = config_callback
         self.telemetry_callback = telemetry_callback
         self.use_random_ports = use_random_ports
+        # Dict of command_code: number of times this command has been sent;
+        # note that the count will wrap around at some point determined
+        # by the data type of Command.counter.
+        self._command_counts = dict()
         self.command_server = one_client_server.OneClientServer(
             name="Command",
             host=host,
@@ -205,7 +209,7 @@ class CommandTelemetryServer:
         Parameters
         ----------
         command : `Command`
-            Command to write.
+            Command to write. Its counter field will be set.
         """
         if not self.start_task.done():
             raise RuntimeError("CommandTelemetryServer not ready.")
@@ -213,6 +217,12 @@ class CommandTelemetryServer:
             raise RuntimeError("No command writer")
         if not isinstance(command, structs.Command):
             raise ValueError(f"command={command!r} must be an instance of structs.Command")
+
+        # Set command.counter to the next value (starting from 1).
+        # Note: this code allows command.counter to wrap around,
+        # without having to know the data type of that field.
+        command.counter = self._command_counts.get(command.code, 0) + 1
+        self._command_counts[command.code] = command.counter
         await utils.write_from(self.command_server.writer, command)
 
     async def monitor_command_reader(self):

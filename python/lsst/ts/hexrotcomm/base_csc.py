@@ -62,7 +62,9 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
     sync_pattern : `int`
         Sync pattern sent with commands.
     CommandCode : `enum`
-        Command codes.
+        Command codes supported by the low-level controller.
+        Must include an item ``SET_STATE``, the only command code
+        used by this class.
     ConfigClass : `ctypes.Structure`
         Configuration structure.
     TelemetryClass : `ctypes.Structure`
@@ -109,18 +111,10 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         self.CommandCode = CommandCode
         self.ConfigClass = ConfigClass
         self.TelemetryClass = TelemetryClass
+        self.sync_pattern = sync_pattern
         self.mock_ctrl = None
+        self._command_lock = asyncio.Lock()
         super().__init__(name=name, index=index, do_callbacks=True)
-
-        # Dict of enum.CommandCode: Command
-        # with constants set to suitable values.
-        self.commands = dict()
-        for code in CommandCode:
-            command = structs.Command()
-            command.code = code
-            command.sync_pattern = sync_pattern
-            self.commands[code] = command
-
         self.heartbeat_interval = 1
         self.heartbeat_task = asyncio.ensure_future(self.heartbeat_loop())
 
@@ -199,13 +193,74 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
             raise salobj.ExpectedError(
                 f"{msg_prefix} state is {self.summary_state!r} instead of {allowed_states_str}")
 
-    async def run_command(self, code, **kwargs):
-        command = self.commands[code]
-        for name, value in kwargs.items():
-            if hasattr(command, name):
-                setattr(command, name, value)
-            else:
-                raise ValueError(f"Unknown command argument {name}")
+    def make_command(self, code, param1=0, param2=0, param3=0, param4=0, param5=0, param6=0):
+        """Make a command from the command identifier and keyword arguments.
+
+        Used to make commands for `run_multiple_commands`.
+
+        Parameters
+        ----------
+        code : ``CommandCode``
+            Command to run.
+        param1, param2, param3, param4, param5, param6: `double`
+            Command parameters. The meaning of these parameters
+            depends on the command code.
+
+        Returns
+        -------
+        command : `Command`
+            The command. Note that the ``counter`` field is 0;
+            it is set by `CommandTelemetryServer.put_command`.
+        """
+        command = structs.Command()
+        command.code = self.CommandCode(code)
+        command.sync_pattern = self.sync_pattern
+        command.param1 = param1
+        command.param2 = param2
+        command.param3 = param3
+        command.param4 = param4
+        command.param5 = param5
+        command.param6 = param6
+        return command
+
+    async def run_command(self, code, param1=0, param2=0, param3=0, param4=0, param5=0, param6=0):
+        """Run one command.
+
+        Parameters
+        ----------
+        code : ``CommandCode``
+            Command to run.
+        param1, param2, param3, param4, param5, param6: `double`
+            Command parameters. The meaning of these parameters
+            depends on the command code.
+        """
+        async with self._command_lock:
+            command = self.make_command(code,
+                                        param1=param1,
+                                        param2=param2,
+                                        param3=param3,
+                                        param4=param4,
+                                        param5=param5,
+                                        param6=param6)
+            await self.server.put_command(command)
+
+    async def run_multiple_commands(self, *commands, delay=None):
+        """Run multiple commands, without allowing other commands to run
+        between them.
+
+        Parameters
+        ----------
+        commands : `List` [`Command`]
+            Commands to run, as constructed by `make_command`.
+        delay : `float` (optional)
+            Delay between commands (sec); or no delay if `None`.
+            Only intended for unit testing.
+        """
+        async with self._command_lock:
+            for command in commands:
+                await self.server.put_command(command)
+                if delay is not None:
+                    await asyncio.sleep(delay)
 
     # Unsupported standard CSC commands.
     async def do_abort(self, data):

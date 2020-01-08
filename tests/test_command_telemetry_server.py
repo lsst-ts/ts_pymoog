@@ -210,21 +210,26 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         telemetry = await self.server.next_telemetry()
         self.assertEqual(telemetry.cmd_position, self.initial_cmd_position)
 
+        expected_counter = 0
         for good_position in (
             self.initial_min_position,
             self.initial_max_position,
             (self.initial_min_position + self.initial_max_position) / 2,
         ):
+            expected_counter += 1
             with self.subTest(good_position=good_position):
-                await self.check_move(cmd_position=good_position)
+                await self.check_move(cmd_position=good_position,
+                                      expected_counter=expected_counter)
         last_good_position = good_position
 
         for bad_position in (
             self.initial_min_position - 0.001,
             self.initial_max_position + 0.001,
         ):
+            expected_counter += 1
             with self.subTest(bad_position=bad_position):
                 await self.check_move(cmd_position=bad_position,
+                                      expected_counter=expected_counter,
                                       expected_position=last_good_position)
 
         # set position commands should not trigger configuration output.
@@ -335,7 +340,7 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         with self.assertRaises(asyncio.TimeoutError):
             await asyncio.wait_for(self.connect_queue.get(), timeout=STD_TIMEOUT)
 
-    async def check_move(self, cmd_position, expected_position=None):
+    async def check_move(self, cmd_position, expected_counter, expected_position=None):
         """Command a position and check the result.
 
         If the commanded position is in bounds then the telemetry
@@ -357,6 +362,7 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         command.code = hexrotcomm.SimpleCommandCode.MOVE
         command.param1 = cmd_position
         await self.server.put_command(command)
+        self.assertEqual(command.counter, expected_counter)
 
         telemetry = await self.server.next_telemetry()
         self.assertEqual(telemetry.cmd_position, expected_position)
