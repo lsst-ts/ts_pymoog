@@ -26,10 +26,11 @@ import asyncio
 import sys
 
 from lsst.ts import salobj
-from lsst.ts import hexrotcomm
 from lsst.ts.idl.enums import Rotator
 from . import enums
 from . import constants
+from . import structs
+from . import command_telemetry_server
 
 
 # Dict of controller state: CSC state.
@@ -61,7 +62,9 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
     sync_pattern : `int`
         Sync pattern sent with commands.
     CommandCode : `enum`
-        Command codes.
+        Command codes supported by the low-level controller.
+        Must include an item ``SET_STATE``, the only command code
+        used by this class.
     ConfigClass : `ctypes.Structure`
         Configuration structure.
     TelemetryClass : `ctypes.Structure`
@@ -108,18 +111,10 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         self.CommandCode = CommandCode
         self.ConfigClass = ConfigClass
         self.TelemetryClass = TelemetryClass
+        self.sync_pattern = sync_pattern
         self.mock_ctrl = None
+        self._command_lock = asyncio.Lock()
         super().__init__(name=name, index=index, do_callbacks=True)
-
-        # Dict of enum.CommandCode: Command
-        # with constants set to suitable values.
-        self.commands = dict()
-        for cmd in CommandCode:
-            command = hexrotcomm.Command()
-            command.cmd = cmd
-            command.sync_pattern = sync_pattern
-            self.commands[cmd] = command
-
         self.heartbeat_interval = 1
         self.heartbeat_task = asyncio.ensure_future(self.heartbeat_loop())
 
@@ -136,7 +131,7 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         await super().start()
         simulating = self.simulation_mode != 0
         host = constants.LOCAL_HOST if simulating else None
-        self.server = hexrotcomm.CommandTelemetryServer(
+        self.server = command_telemetry_server.CommandTelemetryServer(
             host=host,
             log=self.log,
             ConfigClass=self.ConfigClass,
@@ -198,18 +193,76 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
             raise salobj.ExpectedError(
                 f"{msg_prefix} state is {self.summary_state!r} instead of {allowed_states_str}")
 
-    async def run_command(self, cmd, **kwargs):
-        command = self.commands[cmd]
-        for name, value in kwargs.items():
-            if hasattr(command, name):
-                setattr(command, name, value)
-            else:
-                raise ValueError(f"Unknown command argument {name}")
-        # Note: increment correctly wraps around
-        command.counter += 1
-        await self.server.put_command(command)
+    def make_command(self, code, param1=0, param2=0, param3=0, param4=0, param5=0, param6=0):
+        """Make a command from the command identifier and keyword arguments.
 
-    # Unsupported standard CSC commnands.
+        Used to make commands for `run_multiple_commands`.
+
+        Parameters
+        ----------
+        code : ``CommandCode``
+            Command to run.
+        param1, param2, param3, param4, param5, param6: `double`
+            Command parameters. The meaning of these parameters
+            depends on the command code.
+
+        Returns
+        -------
+        command : `Command`
+            The command. Note that the ``counter`` field is 0;
+            it is set by `CommandTelemetryServer.put_command`.
+        """
+        command = structs.Command()
+        command.code = self.CommandCode(code)
+        command.sync_pattern = self.sync_pattern
+        command.param1 = param1
+        command.param2 = param2
+        command.param3 = param3
+        command.param4 = param4
+        command.param5 = param5
+        command.param6 = param6
+        return command
+
+    async def run_command(self, code, param1=0, param2=0, param3=0, param4=0, param5=0, param6=0):
+        """Run one command.
+
+        Parameters
+        ----------
+        code : ``CommandCode``
+            Command to run.
+        param1, param2, param3, param4, param5, param6: `double`
+            Command parameters. The meaning of these parameters
+            depends on the command code.
+        """
+        async with self._command_lock:
+            command = self.make_command(code,
+                                        param1=param1,
+                                        param2=param2,
+                                        param3=param3,
+                                        param4=param4,
+                                        param5=param5,
+                                        param6=param6)
+            await self.server.put_command(command)
+
+    async def run_multiple_commands(self, *commands, delay=None):
+        """Run multiple commands, without allowing other commands to run
+        between them.
+
+        Parameters
+        ----------
+        commands : `List` [`Command`]
+            Commands to run, as constructed by `make_command`.
+        delay : `float` (optional)
+            Delay between commands (sec); or no delay if `None`.
+            Only intended for unit testing.
+        """
+        async with self._command_lock:
+            for command in commands:
+                await self.server.put_command(command)
+                if delay is not None:
+                    await asyncio.sleep(delay)
+
+    # Unsupported standard CSC commands.
     async def do_abort(self, data):
         raise salobj.ExpectedError("Unsupported command")
 
@@ -220,16 +273,16 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
     async def do_setValue(self, data):
         raise salobj.ExpectedError("Unsupported command")
 
-    # Standard CSC commnands.
+    # Standard CSC commands.
     async def do_clearError(self, data):
         """Reset the FAULT state to OFFLINE.
         """
         self.assert_summary_state(salobj.State.FAULT, isbefore=True)
         # Two sequential commands are needed to clear error
-        await self.run_command(cmd=self.CommandCode.SET_STATE,
+        await self.run_command(code=self.CommandCode.SET_STATE,
                                param1=enums.SetStateParam.CLEAR_ERROR)
         await asyncio.sleep(0.9)
-        await self.run_command(cmd=self.CommandCode.SET_STATE,
+        await self.run_command(code=self.CommandCode.SET_STATE,
                                param1=enums.SetStateParam.CLEAR_ERROR)
         await self.server.next_telemetry()
         self.assert_summary_state(salobj.State.OFFLINE, isbefore=False)
@@ -238,7 +291,7 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         """Go from ENABLED state to DISABLED.
         """
         self.assert_summary_state(salobj.State.ENABLED, isbefore=True)
-        await self.run_command(cmd=self.CommandCode.SET_STATE,
+        await self.run_command(code=self.CommandCode.SET_STATE,
                                param1=enums.SetStateParam.DISABLE)
         await self.server.next_telemetry()
         self.assert_summary_state(salobj.State.DISABLED, isbefore=False)
@@ -247,7 +300,7 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         """Go from DISABLED state to ENABLED.
         """
         self.assert_summary_state(salobj.State.DISABLED, isbefore=True)
-        await self.run_command(cmd=self.CommandCode.SET_STATE,
+        await self.run_command(code=self.CommandCode.SET_STATE,
                                param1=enums.SetStateParam.ENABLE)
         await self.server.next_telemetry()
         self.assert_summary_state(salobj.State.ENABLED, isbefore=False)
@@ -259,7 +312,7 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         if self.server.telemetry.offline_substate != Rotator.OfflineSubstate.AVAILABLE:
             raise salobj.ExpectedError(
                 "Use the engineering interface to put the controller into state OFFLINE/AVAILABLE")
-        await self.run_command(cmd=self.CommandCode.SET_STATE,
+        await self.run_command(code=self.CommandCode.SET_STATE,
                                param1=enums.SetStateParam.ENTER_CONTROL)
         await self.server.next_telemetry()
         self.assert_summary_state(salobj.State.STANDBY, isbefore=False)
@@ -268,7 +321,7 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         """Go from STANDBY state to OFFLINE state, AVAILABLE offline substate.
         """
         self.assert_summary_state(salobj.State.STANDBY, isbefore=True)
-        await self.run_command(cmd=self.CommandCode.SET_STATE,
+        await self.run_command(code=self.CommandCode.SET_STATE,
                                param1=enums.SetStateParam.EXIT)
         await self.server.next_telemetry()
         self.assert_summary_state(salobj.State.OFFLINE, isbefore=False)
@@ -284,7 +337,7 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
                 "You must use the clearError command or the engineering user interface "
                 "to clear a rotator fault.")
         self.assert_summary_state(salobj.State.DISABLED, isbefore=True)
-        await self.run_command(cmd=self.CommandCode.SET_STATE,
+        await self.run_command(code=self.CommandCode.SET_STATE,
                                param1=enums.SetStateParam.STANDBY)
         await self.server.next_telemetry()
         self.assert_summary_state(salobj.State.STANDBY, isbefore=False)
@@ -299,7 +352,7 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         I hope we won't need to do that, as it seems complicated.
         """
         self.assert_summary_state(salobj.State.STANDBY, isbefore=True)
-        await self.run_command(cmd=self.CommandCode.SET_STATE,
+        await self.run_command(code=self.CommandCode.SET_STATE,
                                param1=enums.SetStateParam.START)
         await self.server.next_telemetry()
         self.assert_summary_state(salobj.State.DISABLED, isbefore=False)

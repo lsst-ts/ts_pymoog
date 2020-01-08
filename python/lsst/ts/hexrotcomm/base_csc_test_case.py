@@ -47,7 +47,7 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
       assuming you have a binary script to run your CSC.
     """
     async def setUp(self):
-        salobj.test_utils.set_random_lsst_dds_domain()
+        salobj.set_random_lsst_dds_domain()
         self.csc = None  # set by make_csc
         self.remote = None
 
@@ -178,8 +178,9 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
         ----------
         enabled_commands : `List` [`str`]
             List of commands that are valid in the enabled/stationary state,
-            for example ("configureVelocity", "configureAcceleration").
-            Need not include standard commands "disable" and "setLogLevel".
+            for example ("move", "stop").
+            Need not include the standard commands, which are "disable"
+            and "setLogLevel".
         """
         await self.make_csc(initial_state=salobj.State.OFFLINE)
         await self.assert_next_summary_state(salobj.State.OFFLINE)

@@ -25,8 +25,8 @@ import enum
 
 
 class SetStateParam(enum.IntEnum):
-    """Values for ``command.param1`` when
-    ``command.cmd = CommandCode.SET_STATE``.
+    """Values for ``Command.param1`` when
+    ``Command.code = CommandCode.SET_STATE``.
 
     Called ``TriggerCmds`` in Moog code.
     """

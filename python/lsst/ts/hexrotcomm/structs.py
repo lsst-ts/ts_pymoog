@@ -33,7 +33,7 @@ class Command(ctypes.Structure):
     _fields_ = [
         ("sync_pattern", ctypes.c_ushort),
         ("counter", ctypes.c_uint),
-        ("cmd", ctypes.c_uint),
+        ("code", ctypes.c_uint),
         ("param1", ctypes.c_double),
         ("param2", ctypes.c_double),
         ("param3", ctypes.c_double),
