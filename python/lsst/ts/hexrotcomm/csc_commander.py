@@ -58,6 +58,7 @@ async def stdin_generator():
 class CscCommander:
     """Command a Hexapod or Rotator CSC from the command line.
     """
+
     def __init__(self, name, index, help_text):
         self.domain = salobj.Domain()
         self.remote = salobj.Remote(domain=self.domain, name=name, index=index)
@@ -99,17 +100,24 @@ class CscCommander:
         return f"{key}={value}"
 
     def format_data(self, data):
-        return ", ".join(self.format_item(key, value) for key, value in self.get_public_fields(data).items())
+        return ", ".join(
+            self.format_item(key, value)
+            for key, value in self.get_public_fields(data).items()
+        )
 
     def get_public_fields(self, data):
-        return dict((key, value) for key, value in data.get_vars().items()
-                    if not key.startswith("private_") and
-                    key not in ("priority", "timestamp"))
+        return dict(
+            (key, value)
+            for key, value in data.get_vars().items()
+            if not key.startswith("private_") and key not in ("priority", "timestamp")
+        )
 
     def get_rounded_public_fields(self, data):
-        return dict((key, round_any(value)) for key, value in data.get_vars().items()
-                    if not key.startswith("private_") and
-                    key not in ("priority", "timestamp"))
+        return dict(
+            (key, round_any(value))
+            for key, value in data.get_vars().items()
+            if not key.startswith("private_") and key not in ("priority", "timestamp")
+        )
 
     def event_callback(self, data, name):
         """Generic callback for events."""
@@ -121,14 +129,18 @@ class CscCommander:
         public_fields = self.get_rounded_public_fields(data)
         if public_fields != getattr(self, prev_value_name):
             setattr(self, prev_value_name, public_fields)
-            formatted_data = ", ".join(f"{key}={value}" for key, value in public_fields.items())
+            formatted_data = ", ".join(
+                f"{key}={value}" for key, value in public_fields.items()
+            )
             print(f"{name}: {formatted_data}")
 
     def evt_controllerState_callback(self, data):
-        print(f"controllerState: state={Rotator.ControllerState(data.controllerState)!r}; "
-              f"offline_substate={Rotator.OfflineSubstate(data.offlineSubstate)!r}; "
-              f"enabled_substate={Rotator.EnabledSubstate(data.enabledSubstate)!r}; "
-              f"applicationStatus={data.applicationStatus}")
+        print(
+            f"controllerState: state={Rotator.ControllerState(data.controllerState)!r}; "
+            f"offline_substate={Rotator.OfflineSubstate(data.offlineSubstate)!r}; "
+            f"enabled_substate={Rotator.EnabledSubstate(data.enabledSubstate)!r}; "
+            f"applicationStatus={data.applicationStatus}"
+        )
 
     def check_arguments(self, args, *names):
         """Check that the required arguments are provided,
@@ -150,13 +162,17 @@ class CscCommander:
             if required_num_args == 0:
                 raise RuntimeError("no arguments allowed")
             else:
-                raise RuntimeError(f"{required_num_args} arguments required:  "
-                                   f"{names}; {len(args)} provided.")
+                raise RuntimeError(
+                    f"{required_num_args} arguments required:  "
+                    f"{names}; {len(args)} provided."
+                )
 
         def cast(name, arg):
             if isinstance(name, tuple):
                 if len(name) != 2:
-                    raise RuntimeError("Cannot parse {name} as (name, casting function)")
+                    raise RuntimeError(
+                        "Cannot parse {name} as (name, casting function)"
+                    )
                 arg_name, cast_func = name
                 return (arg_name, cast_func(arg))
             else:

@@ -44,6 +44,7 @@ class OneClientServer:
         Function to call when a connection is made.
         It receives one argument: this `OneClientServer`.
     """
+
     def __init__(self, name, host, port, log, connect_callback):
         self.name = name
         self.host = host
@@ -73,9 +74,9 @@ class OneClientServer:
     def connected(self):
         """Return True if the command socket is connected.
         """
-        return not (self.writer is None or
-                    self.writer.is_closing() or
-                    self.reader.at_eof())
+        return not (
+            self.writer is None or self.writer.is_closing() or self.reader.at_eof()
+        )
 
     async def set_reader_writer(self, reader, writer):
         """Set self.reader and self.writer.
@@ -103,7 +104,9 @@ class OneClientServer:
         """
         if self.server is not None:
             raise RuntimeError("Cannot call start more than once.")
-        self.server = await asyncio.start_server(self.set_reader_writer, host=self.host, port=self.port)
+        self.server = await asyncio.start_server(
+            self.set_reader_writer, host=self.host, port=self.port
+        )
         if self.port == 0:
             self.port = self.server.sockets[0].getsockname()[1]
 

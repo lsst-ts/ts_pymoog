@@ -57,15 +57,24 @@ class CommandTelemetryServer:
         else use the standard ports. Use True for unit tests
         to allow running multiple tests in parallel.
     """
+
     connect_timeout = 10
     """Time limit for Moog controller to connect to this server (sec)."""
 
     disconnect_timeout = 5
     """Time limit to close the server and telemetry sockets (sec)."""
 
-    def __init__(self, host, log, ConfigClass, TelemetryClass,
-                 connect_callback, config_callback, telemetry_callback,
-                 use_random_ports=False):
+    def __init__(
+        self,
+        host,
+        log,
+        ConfigClass,
+        TelemetryClass,
+        connect_callback,
+        config_callback,
+        telemetry_callback,
+        use_random_ports=False,
+    ):
         self.host = host
         self.log = log.getChild("CommandTelemetryServer")
         self.header = structs.Header()
@@ -84,13 +93,15 @@ class CommandTelemetryServer:
             host=host,
             port=0 if self.use_random_ports else constants.COMMAND_PORT,
             log=log,
-            connect_callback=self.command_connect_callback)
+            connect_callback=self.command_connect_callback,
+        )
         self.telemetry_server = one_client_server.OneClientServer(
             name="Telemetry",
             host=host,
             port=0 if self.use_random_ports else constants.TELEMETRY_PORT,
             log=log,
-            connect_callback=self.telemetry_connect_callback)
+            connect_callback=self.telemetry_connect_callback,
+        )
 
         self.read_telemetry_and_config_task = asyncio.Future()
         self.read_telemetry_and_config_task.set_result(None)
@@ -156,7 +167,9 @@ class CommandTelemetryServer:
         """
         self.monitor_command_reader_task.cancel()
         if self.command_connected:
-            self.monitor_command_reader_task = asyncio.create_task(self.monitor_command_reader())
+            self.monitor_command_reader_task = asyncio.create_task(
+                self.monitor_command_reader()
+            )
         self.call_connect_callback()
 
     def telemetry_connect_callback(self, telemetry_server):
@@ -164,7 +177,9 @@ class CommandTelemetryServer:
         """
         self.read_telemetry_and_config_task.cancel()
         if self.telemetry_connected:
-            self.read_telemetry_and_config_task = asyncio.create_task(self.read_telemetry_and_config())
+            self.read_telemetry_and_config_task = asyncio.create_task(
+                self.read_telemetry_and_config()
+            )
         self.call_connect_callback()
 
     async def read_telemetry_and_config(self):
@@ -188,8 +203,10 @@ class CommandTelemetryServer:
                     except Exception:
                         self.log.exception("telemetry_callback failed.")
                 else:
-                    self.log.error(f"Invalid telemetry read: unknown frame_id={self.header.frame_id}; "
-                                   "closing the writer.")
+                    self.log.error(
+                        f"Invalid telemetry read: unknown frame_id={self.header.frame_id}; "
+                        "closing the writer."
+                    )
                     break
             except asyncio.CancelledError:
                 # No need to close the telemetry socket because whoever
@@ -216,7 +233,9 @@ class CommandTelemetryServer:
         if not self.command_connected:
             raise RuntimeError("No command writer")
         if not isinstance(command, structs.Command):
-            raise ValueError(f"command={command!r} must be an instance of structs.Command")
+            raise ValueError(
+                f"command={command!r} must be an instance of structs.Command"
+            )
 
         # Set command.counter to the next value (starting from 1).
         # Note: this code allows command.counter to wrap around,
@@ -242,14 +261,18 @@ class CommandTelemetryServer:
 
     async def wait_connected(self):
         """Wait for command and telemetry sockets to be connected."""
-        return asyncio.gather(self.command_server.connected_task, self.telemetry_server.connected_task)
+        return asyncio.gather(
+            self.command_server.connected_task, self.telemetry_server.connected_task
+        )
 
     async def start(self):
         """Start command and telemetry TCP/IP servers.
         """
         if self.start_task.done():
             raise RuntimeError("Cannot call start more than once.")
-        await asyncio.gather(self.command_server.start_task, self.telemetry_server.start_task)
+        await asyncio.gather(
+            self.command_server.start_task, self.telemetry_server.start_task
+        )
 
     def call_connect_callback(self):
         """Call the connect_callback if connection state has changed.
