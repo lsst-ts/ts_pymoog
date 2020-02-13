@@ -6,11 +6,20 @@
 ts_hexrotcomm Revision History
 ##############################
 
-v0.2.1
+v0.3.0
 ======
 
-Allow the ``connect_callback`` argument of `OneClientServer` to be `None`.
-That actually worked before, but it was not documented and resulted in an exception being logged for each callback.
+Major changes:
+
+* Allow the ``connect_callback`` argument of `OneClientServer` to be `None`.
+  That actually worked before, but it was not documented and resulted in an exception being logged for each callback.
+* Code formatted by ``black``, with a pre-commit hook to enforce this. See the README file for configuration instructions.
+
+Requires:
+* ts_salobj 5
+* ts_idl 1
+* ts_xml 4.6
+* Rotator IDL file, e.g. built using `make_idl_file.py Rotator` (for SimpleCsc and unit tests)
 
 v0.2.0
 ======
