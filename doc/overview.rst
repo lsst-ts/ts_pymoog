@@ -41,3 +41,10 @@ TCP/IP communication is surprising in several ways:
 All data is sent as binary: C data structures with no padding (the C structures are defined using ``__attribute__((__packed__))``).
 There is no "end of data" indicator so no way to resynchronize if any bytes are lost.
 `CommandTelemetryServer` handles this by closing the telemetry connection if it cannot understand a telemetry or configuration message, then waiting for the low level controller to reconnect.
+
+Revision History
+================
+
+.. toctree::
+    revision_history
+    :maxdepth: 1

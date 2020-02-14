@@ -46,6 +46,7 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
     * Add a method ``test_bin_script`` which calls `check_bin_script`,
       assuming you have a binary script to run your CSC.
     """
+
     async def setUp(self):
         salobj.set_random_lsst_dds_domain()
         self.csc = None  # set by make_csc
@@ -66,8 +67,13 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError()
 
-    async def make_csc(self, initial_state, simulation_mode=1,
-                       wait_connected=True, log_level=logging.INFO):
+    async def make_csc(
+        self,
+        initial_state,
+        simulation_mode=1,
+        wait_connected=True,
+        log_level=logging.INFO,
+    ):
         """Create a CSC and remote and wait for them to start.
 
         If your CSC is indexed, we suggest you use a different index
@@ -86,20 +92,28 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
         log_level : `int` (optional)
             Logging level, such as `logging.INFO`.
         """
-        self.csc = self.basic_make_csc(initial_state=initial_state, simulation_mode=simulation_mode)
+        self.csc = self.basic_make_csc(
+            initial_state=initial_state, simulation_mode=simulation_mode
+        )
         if len(self.csc.log.handlers) < 2:
             self.csc.log.addHandler(logging.StreamHandler())
             self.csc.log.setLevel(log_level)
-        self.remote = salobj.Remote(domain=self.csc.domain,
-                                    name=self.csc.salinfo.name,
-                                    index=self.csc.salinfo.index)
+        self.remote = salobj.Remote(
+            domain=self.csc.domain,
+            name=self.csc.salinfo.name,
+            index=self.csc.salinfo.index,
+        )
 
-        await asyncio.wait_for(asyncio.gather(self.csc.start_task, self.remote.start_task),
-                               timeout=LONG_TIMEOUT)
+        await asyncio.wait_for(
+            asyncio.gather(self.csc.start_task, self.remote.start_task),
+            timeout=LONG_TIMEOUT,
+        )
         self.csc.mock_ctrl.log.setLevel(log_level)
         if wait_connected:
             for i in range(3):
-                data = await self.remote.evt_connected.next(flush=False, timeout=STD_TIMEOUT)
+                data = await self.remote.evt_connected.next(
+                    flush=False, timeout=STD_TIMEOUT
+                )
                 if data.command and data.telemetry:
                     print("Connected")
                     break
@@ -117,10 +131,13 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
         data = await self.remote.evt_summaryState.next(flush=False, timeout=timeout)
         self.assertEqual(data.summaryState, state)
 
-    async def assert_next_controller_state(self, controllerState=None,
-                                           offlineSubstate=None,
-                                           enabledSubstate=None,
-                                           timeout=STD_TIMEOUT):
+    async def assert_next_controller_state(
+        self,
+        controllerState=None,
+        offlineSubstate=None,
+        enabledSubstate=None,
+        timeout=STD_TIMEOUT,
+    ):
         """Wait for and check the next controllerState event.
 
         Parameters
@@ -156,16 +173,22 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
         """
         exe_path = shutil.which(exe_name)
         if exe_path is None:
-            self.fail(f"Could not find bin script {exe_name}; did you setup or install this package?")
+            self.fail(
+                f"Could not find bin script {exe_name}; did you setup or install this package?"
+            )
 
         if index is None:
             process = await asyncio.create_subprocess_exec(exe_name, "--simulate")
         else:
-            process = await asyncio.create_subprocess_exec(exe_name, str(index), "--simulate")
+            process = await asyncio.create_subprocess_exec(
+                exe_name, str(index), "--simulate"
+            )
         try:
             async with salobj.Domain() as domain:
                 remote = salobj.Remote(domain=domain, name=name, index=index)
-                summaryState_data = await remote.evt_summaryState.next(flush=False, timeout=60)
+                summaryState_data = await remote.evt_summaryState.next(
+                    flush=False, timeout=60
+                )
                 self.assertEqual(summaryState_data.summaryState, salobj.State.OFFLINE)
 
         finally:
@@ -192,13 +215,17 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
         # before the command is acknowledged as done.
         self.assertEqual(self.csc.summary_state, salobj.State.STANDBY)
         await self.assert_next_summary_state(salobj.State.STANDBY)
-        await self.check_bad_commands(good_commands=("start", "exitControl", "setLogLevel"))
+        await self.check_bad_commands(
+            good_commands=("start", "exitControl", "setLogLevel")
+        )
 
         # send start; new state is DISABLED
         await self.remote.cmd_start.start(timeout=STD_TIMEOUT)
         self.assertEqual(self.csc.summary_state, salobj.State.DISABLED)
         await self.assert_next_summary_state(salobj.State.DISABLED)
-        await self.check_bad_commands(good_commands=("enable", "standby", "setLogLevel"))
+        await self.check_bad_commands(
+            good_commands=("enable", "standby", "setLogLevel")
+        )
 
         # send enable; new state is ENABLED
         await self.remote.cmd_enable.start(timeout=STD_TIMEOUT)
@@ -284,11 +311,16 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
         """
         for bad_simulation_mode in (-1, 2, 3):
             with self.assertRaises(ValueError):
-                self.basic_make_csc(initial_state=salobj.State.OFFLINE, simulation_mode=bad_simulation_mode)
+                self.basic_make_csc(
+                    initial_state=salobj.State.OFFLINE,
+                    simulation_mode=bad_simulation_mode,
+                )
 
     async def test_non_simulation_mode(self):
         ignored_initial_state = salobj.State.DISABLED
-        async with self.basic_make_csc(initial_state=ignored_initial_state, simulation_mode=0) as csc:
+        async with self.basic_make_csc(
+            initial_state=ignored_initial_state, simulation_mode=0
+        ) as csc:
             self.assertIsNone(csc.mock_ctrl)
             await asyncio.sleep(0.2)
             self.assertFalse(csc.server.command_connected)

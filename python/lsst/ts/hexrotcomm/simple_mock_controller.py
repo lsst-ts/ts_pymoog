@@ -18,8 +18,13 @@
 #
 # You should have received a copy of the GNU General Public License
 
-__all__ = ["SIMPLE_SYNC_PATTERN", "SimpleCommandCode", "SimpleConfig", "SimpleTelemetry",
-           "SimpleMockController"]
+__all__ = [
+    "SIMPLE_SYNC_PATTERN",
+    "SimpleCommandCode",
+    "SimpleConfig",
+    "SimpleTelemetry",
+    "SimpleMockController",
+]
 
 import ctypes
 import enum
@@ -41,6 +46,7 @@ class SimpleCommandCode(enum.IntEnum):
 class SimpleConfig(ctypes.Structure):
     """Configuration of SimpleMockController.
     """
+
     _pack_ = 1
     _fields_ = [
         ("min_position", ctypes.c_double),
@@ -53,6 +59,7 @@ class SimpleConfig(ctypes.Structure):
 class SimpleTelemetry(ctypes.Structure):
     """Telemetry from SimpleMockController.
     """
+
     _pack_ = 1
     _fields_ = [
         ("application_status", ctypes.c_uint),
@@ -89,20 +96,21 @@ class SimpleMockController(base_mock_controller.BaseMockController):
     The ``MOVE`` command is rejected if the new position is
     not within the configured limits.
     """
-    def __init__(self,
-                 log,
-                 host=constants.LOCAL_HOST,
-                 command_port=constants.COMMAND_PORT,
-                 telemetry_port=constants.TELEMETRY_PORT,
-                 initial_state=Rotator.ControllerState.OFFLINE):
+
+    def __init__(
+        self,
+        log,
+        host=constants.LOCAL_HOST,
+        command_port=constants.COMMAND_PORT,
+        telemetry_port=constants.TELEMETRY_PORT,
+        initial_state=Rotator.ControllerState.OFFLINE,
+    ):
         config = SimpleConfig()
         config.min_position = -25
         config.max_position = 25
         config.max_velocity = 47
         telemetry = SimpleTelemetry()
-        extra_commands = {
-            SimpleCommandCode.MOVE: self.do_position_set,
-        }
+        extra_commands = {SimpleCommandCode.MOVE: self.do_position_set}
         super().__init__(
             log=log,
             CommandCode=SimpleCommandCode,
@@ -122,7 +130,9 @@ class SimpleMockController(base_mock_controller.BaseMockController):
             self.config.max_velocity = max_velocity
             await self.write_config()
         else:
-            self.log.error(f"Commanded max velocity {max_velocity} <= 0; ignoring the command.")
+            self.log.error(
+                f"Commanded max velocity {max_velocity} <= 0; ignoring the command."
+            )
 
     async def do_position_set(self, command):
         self.assert_state(Rotator.ControllerState.ENABLED)
@@ -131,8 +141,10 @@ class SimpleMockController(base_mock_controller.BaseMockController):
             self.telemetry.cmd_position = position
             self.telemetry.curr_position = position
         else:
-            self.log.error(f"Commanded position {position} out of range "
-                           f"[{self.config.min_position}, {self.config.max_position}]; ignoring the command.")
+            self.log.error(
+                f"Commanded position {position} out of range "
+                f"[{self.config.min_position}, {self.config.max_position}]; ignoring the command."
+            )
 
     async def update_telemetry(self):
         self.telemetry.application_status = Rotator.ApplicationStatus.DDS_COMMAND_SOURCE

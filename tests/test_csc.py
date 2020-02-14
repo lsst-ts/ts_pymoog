@@ -32,7 +32,9 @@ STD_TIMEOUT = 5  # timeout for command ack
 
 class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
     def basic_make_csc(self, initial_state=salobj.State.OFFLINE, simulation_mode=1):
-        return hexrotcomm.SimpleCsc(initial_state=initial_state, simulation_mode=simulation_mode)
+        return hexrotcomm.SimpleCsc(
+            initial_state=initial_state, simulation_mode=simulation_mode
+        )
 
     async def move_sequentially(self, *positions, delay=None):
         """Move sequentially to different positions, in order to test
@@ -51,8 +53,9 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
         """
         commands = []
         for position in positions:
-            command = self.csc.make_command(code=hexrotcomm.SimpleCommandCode.MOVE,
-                                            param1=position)
+            command = self.csc.make_command(
+                code=hexrotcomm.SimpleCommandCode.MOVE, param1=position
+            )
             commands.append(command)
         await self.csc.run_multiple_commands(*commands, delay=delay)
 
@@ -61,7 +64,9 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
         """
         destination = 2  # a small move so the test runs quickly
         await self.make_csc(initial_state=salobj.State.ENABLED)
-        await self.assert_next_controller_state(controllerState=Rotator.ControllerState.ENABLED)
+        await self.assert_next_controller_state(
+            controllerState=Rotator.ControllerState.ENABLED
+        )
         data = await self.remote.tel_Application.next(flush=True, timeout=STD_TIMEOUT)
         self.assertAlmostEqual(data.Demand, 0)
         await self.remote.cmd_move.set_start(position=destination, timeout=STD_TIMEOUT)
@@ -73,8 +78,10 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
         """
         target_positions = (1, 2, 3)  # Small moves so the test runs quickly
         await self.make_csc(initial_state=salobj.State.ENABLED)
-        await self.assert_next_controller_state(controllerState=Rotator.ControllerState.ENABLED)
-        telemetry_delay = self.csc.mock_ctrl.telemetry_interval*3
+        await self.assert_next_controller_state(
+            controllerState=Rotator.ControllerState.ENABLED
+        )
+        telemetry_delay = self.csc.mock_ctrl.telemetry_interval * 3
 
         # Record demand positions from the `application` telemetry topic.
         demand_positions = []
@@ -89,7 +96,9 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
         await asyncio.sleep(telemetry_delay)
 
         # Start moving to the specified positions
-        task1 = asyncio.ensure_future(self.move_sequentially(*target_positions, delay=telemetry_delay))
+        task1 = asyncio.ensure_future(
+            self.move_sequentially(*target_positions, delay=telemetry_delay)
+        )
         # Give this task a chance to start running
         await asyncio.sleep(0.01)
 

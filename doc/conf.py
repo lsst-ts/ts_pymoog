@@ -8,6 +8,8 @@ import lsst.ts.hexrotcomm
 
 
 _g = globals()
-_g.update(build_package_configs(
-    project_name='ts_hexrotcomm',
-    version=lsst.ts.hexrotcomm.__version__))
+_g.update(
+    build_package_configs(
+        project_name="ts_hexrotcomm", version=lsst.ts.hexrotcomm.__version__
+    )
+)

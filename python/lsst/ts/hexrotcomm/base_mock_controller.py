@@ -28,7 +28,9 @@ from . import enums
 from . import command_telemetry_client
 
 
-class BaseMockController(command_telemetry_client.CommandTelemetryClient, metaclass=abc.ABCMeta):
+class BaseMockController(
+    command_telemetry_client.CommandTelemetryClient, metaclass=abc.ABCMeta
+):
     """Base class for a mock Moog TCP/IP controller with states.
 
     The controller uses two TCP/IP _client_ sockets,
@@ -74,19 +76,22 @@ class BaseMockController(command_telemetry_client.CommandTelemetryClient, metacl
 
         await ctrl.stop()
     """
+
     connect_retry_interval = 0.1
     """Interval between connection retries (sec)."""
 
-    def __init__(self,
-                 log,
-                 CommandCode,
-                 extra_commands,
-                 config,
-                 telemetry,
-                 host=constants.LOCAL_HOST,
-                 command_port=constants.COMMAND_PORT,
-                 telemetry_port=constants.TELEMETRY_PORT,
-                 initial_state=Rotator.ControllerState.OFFLINE):
+    def __init__(
+        self,
+        log,
+        CommandCode,
+        extra_commands,
+        config,
+        telemetry,
+        host=constants.LOCAL_HOST,
+        command_port=constants.COMMAND_PORT,
+        telemetry_port=constants.TELEMETRY_PORT,
+        initial_state=Rotator.ControllerState.OFFLINE,
+    ):
         self.CommandCode = CommandCode
 
         # Dict of command key: command
@@ -96,8 +101,14 @@ class BaseMockController(command_telemetry_client.CommandTelemetryClient, metacl
             (CommandCode.SET_STATE, enums.SetStateParam.STANDBY): self.do_standby,
             (CommandCode.SET_STATE, enums.SetStateParam.DISABLE): self.do_disable,
             (CommandCode.SET_STATE, enums.SetStateParam.EXIT): self.do_exit,
-            (CommandCode.SET_STATE, enums.SetStateParam.CLEAR_ERROR): self.do_clear_error,
-            (CommandCode.SET_STATE, enums.SetStateParam.ENTER_CONTROL): self.do_enter_control,
+            (
+                CommandCode.SET_STATE,
+                enums.SetStateParam.CLEAR_ERROR,
+            ): self.do_clear_error,
+            (
+                CommandCode.SET_STATE,
+                enums.SetStateParam.ENTER_CONTROL,
+            ): self.do_enter_control,
         }
         self.command_table.update(extra_commands)
 
@@ -107,7 +118,8 @@ class BaseMockController(command_telemetry_client.CommandTelemetryClient, metacl
             telemetry=telemetry,
             host=host,
             command_port=command_port,
-            telemetry_port=telemetry_port)
+            telemetry_port=telemetry_port,
+        )
 
         self.set_state(initial_state)
 
@@ -124,29 +136,41 @@ class BaseMockController(command_telemetry_client.CommandTelemetryClient, metacl
         return self.telemetry.enabled_substate
 
     def assert_stationary(self):
-        self.assert_state(Rotator.ControllerState.ENABLED,
-                          enabled_substate=Rotator.EnabledSubstate.STATIONARY)
+        self.assert_state(
+            Rotator.ControllerState.ENABLED,
+            enabled_substate=Rotator.EnabledSubstate.STATIONARY,
+        )
 
     def get_command_key(self, command):
         """Return the key to command_table."""
-        if command.code in (self.CommandCode.SET_STATE,
-                            self.CommandCode.SET_ENABLED_SUBSTATE):
+        if command.code in (
+            self.CommandCode.SET_STATE,
+            self.CommandCode.SET_ENABLED_SUBSTATE,
+        ):
             return (command.code, int(command.param1))
         return command.code
 
     def assert_state(self, state, offline_substate=None, enabled_substate=None):
         if self.state != state:
-            raise RuntimeError(f"state={self.state!r}; must be {state!r} for this command.")
+            raise RuntimeError(
+                f"state={self.state!r}; must be {state!r} for this command."
+            )
         if offline_substate is not None and self.offline_substate != offline_substate:
-            raise RuntimeError(f"offline_substate={self.offline_substate!r}; "
-                               f"must be {offline_substate!r} for this command.")
+            raise RuntimeError(
+                f"offline_substate={self.offline_substate!r}; "
+                f"must be {offline_substate!r} for this command."
+            )
         if enabled_substate is not None and self.enabled_substate != enabled_substate:
-            raise RuntimeError(f"enabled_substate={self.enabled_substate!r}; "
-                               f"must be {enabled_substate!r} for this command.")
+            raise RuntimeError(
+                f"enabled_substate={self.enabled_substate!r}; "
+                f"must be {enabled_substate!r} for this command."
+            )
 
     async def do_enter_control(self, command):
-        self.assert_state(Rotator.ControllerState.OFFLINE,
-                          offline_substate=Rotator.OfflineSubstate.AVAILABLE)
+        self.assert_state(
+            Rotator.ControllerState.OFFLINE,
+            offline_substate=Rotator.OfflineSubstate.AVAILABLE,
+        )
         self.set_state(Rotator.ControllerState.STANDBY)
 
     async def do_start(self, command):
@@ -174,30 +198,41 @@ class BaseMockController(command_telemetry_client.CommandTelemetryClient, metacl
         # requires two sequential CLEAR_COMMAND commands. For the mock
         # controller the first command will (probably) transition from FAULT
         # to OFFLINE, but the second must be accepted without complaint.
-        if self.state not in (Rotator.ControllerState.FAULT, Rotator.ControllerState.OFFLINE):
-            raise RuntimeError(f"state={self.state!r}; must be FAULT or OFFLINE for this command.")
+        if self.state not in (
+            Rotator.ControllerState.FAULT,
+            Rotator.ControllerState.OFFLINE,
+        ):
+            raise RuntimeError(
+                f"state={self.state!r}; must be FAULT or OFFLINE for this command."
+            )
         self.set_state(Rotator.ControllerState.OFFLINE)
 
     async def run_command(self, command):
-        self.log.debug(f"run_command: "
-                       f"sync_pattern={hex(command.sync_pattern)}; "
-                       f"counter={command.counter}; "
-                       f"command={self.CommandCode(command.code)!r}; "
-                       f"param1={command.param1}; "
-                       f"param2={command.param2}; "
-                       f"param3={command.param3}; "
-                       f"param4={command.param4}; "
-                       f"param5={command.param5}; "
-                       f"param6={command.param6}")
+        self.log.debug(
+            f"run_command: "
+            f"sync_pattern={hex(command.sync_pattern)}; "
+            f"counter={command.counter}; "
+            f"command={self.CommandCode(command.code)!r}; "
+            f"param1={command.param1}; "
+            f"param2={command.param2}; "
+            f"param3={command.param3}; "
+            f"param4={command.param4}; "
+            f"param5={command.param5}; "
+            f"param6={command.param6}"
+        )
         key = self.get_command_key(command)
         cmd_method = self.command_table.get(key, None)
         if cmd_method is None:
-            self.log.error(f"Unrecognized command code {command.code}; param1={command.param1}...")
+            self.log.error(
+                f"Unrecognized command code {command.code}; param1={command.param1}..."
+            )
             return
         try:
             await cmd_method(command)
         except Exception as e:
-            self.log.error(f"Command code {command.code}; param1={command.param1}... failed: {e}")
+            self.log.error(
+                f"Command code {command.code}; param1={command.param1}... failed: {e}"
+            )
         await self.end_run_command(command=command, cmd_method=cmd_method)
 
     @abc.abstractmethod
@@ -231,13 +266,21 @@ class BaseMockController(command_telemetry_client.CommandTelemetryClient, metacl
         of that state, and we don't have an EUI for the mock controller!
         """
         self.telemetry.state = Rotator.ControllerState(state)
-        self.telemetry.offline_substate = Rotator.OfflineSubstate.AVAILABLE \
-            if self.telemetry.state == Rotator.ControllerState.OFFLINE else 0
-        self.telemetry.enabled_substate = Rotator.EnabledSubstate.STATIONARY \
-            if self.telemetry.state == Rotator.ControllerState.ENABLED else 0
-        self.log.debug(f"set_state: state={Rotator.ControllerState(self.telemetry.state)!r}; "
-                       f"offline_substate={Rotator.OfflineSubstate(self.telemetry.offline_substate)}; "
-                       f"enabled_substate={Rotator.EnabledSubstate(self.telemetry.enabled_substate)}")
+        self.telemetry.offline_substate = (
+            Rotator.OfflineSubstate.AVAILABLE
+            if self.telemetry.state == Rotator.ControllerState.OFFLINE
+            else 0
+        )
+        self.telemetry.enabled_substate = (
+            Rotator.EnabledSubstate.STATIONARY
+            if self.telemetry.state == Rotator.ControllerState.ENABLED
+            else 0
+        )
+        self.log.debug(
+            f"set_state: state={Rotator.ControllerState(self.telemetry.state)!r}; "
+            f"offline_substate={Rotator.OfflineSubstate(self.telemetry.offline_substate)}; "
+            f"enabled_substate={Rotator.EnabledSubstate(self.telemetry.enabled_substate)}"
+        )
 
     @abc.abstractmethod
     async def update_telemetry(self):

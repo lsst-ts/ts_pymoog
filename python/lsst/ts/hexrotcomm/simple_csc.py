@@ -87,25 +87,34 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         self._prev_flags_tracking_success = False
         self._prev_flags_tracking_lost = False
 
-        super().__init__(name="Rotator",
-                         index=0,
-                         sync_pattern=hexrotcomm.SIMPLE_SYNC_PATTERN,
-                         CommandCode=simple_mock_controller.SimpleCommandCode,
-                         ConfigClass=simple_mock_controller.SimpleConfig,
-                         TelemetryClass=simple_mock_controller.SimpleTelemetry,
-                         initial_state=initial_state,
-                         simulation_mode=simulation_mode)
+        super().__init__(
+            name="Rotator",
+            index=0,
+            sync_pattern=hexrotcomm.SIMPLE_SYNC_PATTERN,
+            CommandCode=simple_mock_controller.SimpleCommandCode,
+            ConfigClass=simple_mock_controller.SimpleConfig,
+            TelemetryClass=simple_mock_controller.SimpleTelemetry,
+            initial_state=initial_state,
+            simulation_mode=simulation_mode,
+        )
 
     async def do_move(self, data):
         """Specify a position.
         """
         self.assert_enabled_substate(Rotator.EnabledSubstate.STATIONARY)
-        if not self.server.config.min_position <= data.position <= self.server.config.max_position:
-            raise salobj.ExpectedError(f"position {data.position} not in range "
-                                       f"[{self.server.config.min_position}, "
-                                       f"{self.server.config.max_position}]")
-        await self.run_command(code=simple_mock_controller.SimpleCommandCode.MOVE,
-                               param1=data.position)
+        if (
+            not self.server.config.min_position
+            <= data.position
+            <= self.server.config.max_position
+        ):
+            raise salobj.ExpectedError(
+                f"position {data.position} not in range "
+                f"[{self.server.config.min_position}, "
+                f"{self.server.config.max_position}]"
+            )
+        await self.run_command(
+            code=simple_mock_controller.SimpleCommandCode.MOVE, param1=data.position
+        )
 
     async def do_configureAcceleration(self, data):
         raise salobj.ExpectedError("Not implemented")
@@ -153,11 +162,16 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         # Strangely telemetry.state, offline_substate and enabled_substate
         # are all floats from the controller. But they should only have
         # integer value, so I output them as integers.
-        self.evt_controllerState.set_put(controllerState=int(server.telemetry.state),
-                                         offlineSubstate=int(server.telemetry.offline_substate),
-                                         enabledSubstate=int(server.telemetry.enabled_substate))
+        self.evt_controllerState.set_put(
+            controllerState=int(server.telemetry.state),
+            offlineSubstate=int(server.telemetry.offline_substate),
+            enabledSubstate=int(server.telemetry.enabled_substate),
+        )
         self.evt_commandableByDDS.set_put(
-            state=bool(server.telemetry.application_status & Rotator.ApplicationStatus.DDS_COMMAND_SOURCE),
+            state=bool(
+                server.telemetry.application_status
+                & Rotator.ApplicationStatus.DDS_COMMAND_SOURCE
+            )
         )
 
         self.tel_Application.set_put(
@@ -172,4 +186,5 @@ class SimpleCsc(hexrotcomm.BaseCsc):
             host=self.server.host,
             initial_state=initial_ctrl_state,
             command_port=self.server.command_port,
-            telemetry_port=self.server.telemetry_port)
+            telemetry_port=self.server.telemetry_port,
+        )

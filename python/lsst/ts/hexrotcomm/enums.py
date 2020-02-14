@@ -30,6 +30,7 @@ class SetStateParam(enum.IntEnum):
 
     Called ``TriggerCmds`` in Moog code.
     """
+
     INVALID = 0
     START = enum.auto()
     ENABLE = enum.auto()

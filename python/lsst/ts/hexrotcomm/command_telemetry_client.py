@@ -68,20 +68,23 @@ class CommandTelemetryClient:
 
         await client.stop()
     """
+
     telemetry_interval = 0.1
     """Interval between telemetry messages (sec)."""
 
     connect_retry_interval = 0.1
     """Interval between connection retries (sec)."""
 
-    def __init__(self, *,
-                 log,
-                 config,
-                 telemetry,
-                 host=constants.LOCAL_HOST,
-                 command_port=constants.COMMAND_PORT,
-                 telemetry_port=constants.TELEMETRY_PORT,
-                 ):
+    def __init__(
+        self,
+        *,
+        log,
+        config,
+        telemetry,
+        host=constants.LOCAL_HOST,
+        command_port=constants.COMMAND_PORT,
+        telemetry_port=constants.TELEMETRY_PORT,
+    ):
         self.log = log.getChild("BaseMockController")
         self.config = config
         self.telemetry = telemetry
@@ -117,17 +120,21 @@ class CommandTelemetryClient:
     def command_connected(self):
         """Return True if the command socket is connected.
         """
-        return not (self.command_writer is None or
-                    self.command_writer.is_closing() or
-                    self.command_reader.at_eof())
+        return not (
+            self.command_writer is None
+            or self.command_writer.is_closing()
+            or self.command_reader.at_eof()
+        )
 
     @property
     def telemetry_connected(self):
         """Return True if the telemetry socket is connected.
         """
-        return not (self.telemetry_writer is None or
-                    self.telemetry_writer.is_closing() or
-                    self.telemetry_reader.at_eof())
+        return not (
+            self.telemetry_writer is None
+            or self.telemetry_writer.is_closing()
+            or self.telemetry_reader.at_eof()
+        )
 
     async def close(self):
         """Kill command and telemetry tasks and close the connections.
@@ -185,9 +192,12 @@ class CommandTelemetryClient:
             self.command_writer.close()
         while True:
             try:
-                self.log.debug(f"connect_command: connect to host={self.host}, port={self.command_port}")
-                self.command_reader, self.command_writer = \
-                    await asyncio.open_connection(host=self.host, port=self.command_port)
+                self.log.debug(
+                    f"connect_command: connect to host={self.host}, port={self.command_port}"
+                )
+                self.command_reader, self.command_writer = await asyncio.open_connection(
+                    host=self.host, port=self.command_port
+                )
                 return
             except Exception as e:
                 self.log.warning(f"connect_command failed with {e}; retrying")
@@ -204,9 +214,12 @@ class CommandTelemetryClient:
             self.telemetry_writer.close()
         while True:
             try:
-                self.log.debug(f"connect_telemetry: connect to host={self.host}, port={self.telemetry_port}")
-                self.telemetry_reader, self.telemetry_writer = \
-                    await asyncio.open_connection(host=self.host, port=self.telemetry_port)
+                self.log.debug(
+                    f"connect_telemetry: connect to host={self.host}, port={self.telemetry_port}"
+                )
+                self.telemetry_reader, self.telemetry_writer = await asyncio.open_connection(
+                    host=self.host, port=self.telemetry_port
+                )
                 return
             except Exception as e:
                 self.log.warning(f"connect_telemetry failed with {e}; retrying")

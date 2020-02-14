@@ -29,6 +29,7 @@ class Command(ctypes.Structure):
 
     Called ``commandStreamStructure_t`` in the Moog code.
     """
+
     _pack_ = 1
     _fields_ = [
         ("sync_pattern", ctypes.c_ushort),
@@ -48,6 +49,7 @@ class Header(ctypes.Structure):
 
     Called ``telemetryHeaderStructure_t`` in the Moog code.
     """
+
     _pack_ = 1
     _fields_ = [
         ("sync_pattern", ctypes.c_ushort),

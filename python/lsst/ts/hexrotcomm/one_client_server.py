@@ -40,9 +40,11 @@ class OneClientServer:
         IP port for this server. If 0 then use a random port.
     log : `logging.Logger`
         Logger.
-    connect_callback : callable
+    connect_callback : callable or `None`
         Function to call when a connection is made.
+        It receives one argument: this `OneClientServer`.
     """
+
     def __init__(self, name, host, port, log, connect_callback):
         self.name = name
         self.host = host
@@ -72,9 +74,9 @@ class OneClientServer:
     def connected(self):
         """Return True if the command socket is connected.
         """
-        return not (self.writer is None or
-                    self.writer.is_closing() or
-                    self.reader.at_eof())
+        return not (
+            self.writer is None or self.writer.is_closing() or self.reader.at_eof()
+        )
 
     async def set_reader_writer(self, reader, writer):
         """Set self.reader and self.writer.
@@ -102,7 +104,9 @@ class OneClientServer:
         """
         if self.server is not None:
             raise RuntimeError("Cannot call start more than once.")
-        self.server = await asyncio.start_server(self.set_reader_writer, host=self.host, port=self.port)
+        self.server = await asyncio.start_server(
+            self.set_reader_writer, host=self.host, port=self.port
+        )
         if self.port == 0:
             self.port = self.server.sockets[0].getsockname()[1]
 
@@ -111,17 +115,15 @@ class OneClientServer:
         """
         connected = self.connected
         if self._last_connected != connected:
-            try:
-                self.connect_callback(self)
-            except Exception:
-                self.log.exception("connect_callback failed.")
+            if self.connect_callback is not None:
+                try:
+                    self.connect_callback(self)
+                except Exception:
+                    self.log.exception("connect_callback failed.")
             self._last_connected = connected
 
-    async def async_call_connect_callback(self):
-        self.call_connect_callback()
-
     async def close_client(self):
-        """Close the client socket.
+        """Close the connected client socket, if any.
         """
         self.log.info("Closing the client socket.")
         if self.writer is None:
@@ -132,6 +134,8 @@ class OneClientServer:
 
     async def close(self):
         """Close socket server and client socket and set the done_task done.
+
+        Always safe to call.
         """
         self.log.info("Closing the server.")
         self.server.close()
