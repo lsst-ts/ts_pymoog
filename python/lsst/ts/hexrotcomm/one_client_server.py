@@ -138,7 +138,8 @@ class OneClientServer:
         Always safe to call.
         """
         self.log.info("Closing the server.")
-        self.server.close()
+        if self.server is not None:
+            self.server.close()
         await self.close_client()
         if self.done_task.done():
             self.done_task.set_result(None)
