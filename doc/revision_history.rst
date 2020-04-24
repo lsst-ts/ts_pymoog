@@ -6,6 +6,21 @@
 ts_hexrotcomm Revision History
 ##############################
 
+v0.4.0
+======
+
+Changes:
+
+* The clearError command in the mock controller now transitions to STANDBY instead of OFFLINE/AVAILABLE.
+  This matches a recent change to the rotator controller and a planned change to the hexapod controller.
+* Fixed a bug in `OneClientServer.close`: it would fail if called twice.
+
+Requires:
+* ts_salobj 5
+* ts_idl 1
+* ts_xml 4.6
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+
 v0.3.0
 ======
 
@@ -19,7 +34,7 @@ Requires:
 * ts_salobj 5
 * ts_idl 1
 * ts_xml 4.6
-* Rotator IDL file, e.g. built using `make_idl_file.py Rotator` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
 
 v0.2.0
 ======
@@ -36,7 +51,7 @@ Requires:
 * ts_salobj 5
 * ts_idl 1
 * ts_xml 4.6
-* Rotator IDL file, e.g. built using `make_idl_file.py Rotator` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
 
 v0.1.1
 ======
@@ -46,7 +61,7 @@ Fix an error in the MockController's CLEAR_ERROR command.
 Requires
 * ts_salobj 5
 * ts_idl 1
-* Rotator IDL file, e.g. built using `make_idl_file.py Rotator` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
 
 v0.1.0
 ======
@@ -56,4 +71,4 @@ Initial release.
 Requires
 * ts_salobj 5
 * ts_idl 1
-* Rotator IDL file, e.g. built using `make_idl_file.py Rotator`
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
