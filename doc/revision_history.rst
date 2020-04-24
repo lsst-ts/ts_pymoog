@@ -6,6 +6,21 @@
 ts_hexrotcomm Revision History
 ##############################
 
+v0.4.0
+======
+
+Changes:
+
+* The clearError command in the mock controller now transitions to the STANDBY state instead of FAULT.
+  This matches a recent change in the real controller.
+* Fixed a bug in `OneClientServer.close`: it would fail if called twice.
+
+Requires:
+* ts_salobj 5
+* ts_idl 1
+* ts_xml 4.6
+* Rotator IDL file, e.g. built using `make_idl_file.py Rotator` (for SimpleCsc and unit tests)
+
 v0.3.0
 ======
 
