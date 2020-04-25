@@ -194,18 +194,18 @@ class BaseMockController(
         self.set_state(Rotator.ControllerState.OFFLINE)
 
     async def do_clear_error(self, command):
-        # Allow initial state FAULT and OFFLINE because the real controller
+        # Allow initial state FAULT and STANDBY because the real controller
         # requires two sequential CLEAR_COMMAND commands. For the mock
         # controller the first command will (probably) transition from FAULT
-        # to OFFLINE, but the second must be accepted without complaint.
+        # to STANDBY, but the second must be accepted without complaint.
         if self.state not in (
             Rotator.ControllerState.FAULT,
-            Rotator.ControllerState.OFFLINE,
+            Rotator.ControllerState.STANDBY,
         ):
             raise RuntimeError(
-                f"state={self.state!r}; must be FAULT or OFFLINE for this command."
+                f"state={self.state!r}; must be FAULT or STANDBY for this command."
             )
-        self.set_state(Rotator.ControllerState.OFFLINE)
+        self.set_state(Rotator.ControllerState.STANDBY)
 
     async def run_command(self, command):
         self.log.debug(

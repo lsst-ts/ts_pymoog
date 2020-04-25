@@ -281,12 +281,7 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
         await self.make_csc(initial_state=salobj.State.FAULT)
         await self.assert_next_summary_state(salobj.State.FAULT)
         await self.remote.cmd_clearError.start(timeout=STD_TIMEOUT)
-        # Note: the vendor's low level controller code goes to state=OFFLINE
-        # offlineSubstate=PUBLISH_ONLY, which requires the Engineering User
-        # Interface to restore control to the CSC.
-        # The mock controller goes to state=OFFLINE
-        # offlineSubstate=PUBLISH_ONLY to avoid this issue.
-        await self.assert_next_summary_state(salobj.State.OFFLINE)
+        await self.assert_next_summary_state(salobj.State.STANDBY)
 
     async def test_initial_state_offline(self):
         await self.check_initial_state(salobj.State.OFFLINE)
