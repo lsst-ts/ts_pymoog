@@ -291,7 +291,7 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
 
     # Standard CSC commands.
     async def do_clearError(self, data):
-        """Reset the FAULT state to OFFLINE.
+        """Reset the FAULT state to STANDBY.
         """
         self.assert_summary_state(salobj.State.FAULT, isbefore=True)
         # Two sequential commands are needed to clear error
@@ -303,7 +303,7 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
             code=self.CommandCode.SET_STATE, param1=enums.SetStateParam.CLEAR_ERROR
         )
         await self.server.next_telemetry()
-        self.assert_summary_state(salobj.State.OFFLINE, isbefore=False)
+        self.assert_summary_state(salobj.State.STANDBY, isbefore=False)
 
     async def do_disable(self, data):
         """Go from ENABLED state to DISABLED.
@@ -352,8 +352,7 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
     async def do_standby(self, data):
         """Go from DISABLED state to STANDBY.
 
-        Note: unlike standard CSCs this command will not take FAULT state
-        to DISABLED. Use the clearError command to leave FAULT state.
+        Note: use the clearError command to go from FAULT to STANDBY.
         """
         if self.summary_state == salobj.State.FAULT:
             raise salobj.ExpectedError(

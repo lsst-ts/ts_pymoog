@@ -195,7 +195,10 @@ class CommandTelemetryClient:
                 self.log.debug(
                     f"connect_command: connect to host={self.host}, port={self.command_port}"
                 )
-                self.command_reader, self.command_writer = await asyncio.open_connection(
+                (
+                    self.command_reader,
+                    self.command_writer,
+                ) = await asyncio.open_connection(
                     host=self.host, port=self.command_port
                 )
                 return
@@ -217,7 +220,10 @@ class CommandTelemetryClient:
                 self.log.debug(
                     f"connect_telemetry: connect to host={self.host}, port={self.telemetry_port}"
                 )
-                self.telemetry_reader, self.telemetry_writer = await asyncio.open_connection(
+                (
+                    self.telemetry_reader,
+                    self.telemetry_writer,
+                ) = await asyncio.open_connection(
                     host=self.host, port=self.telemetry_port
                 )
                 return

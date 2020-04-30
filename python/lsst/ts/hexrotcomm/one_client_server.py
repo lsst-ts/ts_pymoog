@@ -41,7 +41,7 @@ class OneClientServer:
     log : `logging.Logger`
         Logger.
     connect_callback : callable or `None`
-        Function to call when a connection is made.
+        Synchronous function to call when a connection is made or dropped.
         It receives one argument: this `OneClientServer`.
     """
 
@@ -49,7 +49,7 @@ class OneClientServer:
         self.name = name
         self.host = host
         self.port = port
-        self.log = log.getChild(f"{name}OneClientServer")
+        self.log = log.getChild(f"OneClientServer({name})")
         self.connect_callback = connect_callback
         # Was the client connected last time `call_connected_callback`
         # called? Used to prevent multiple calls to ``connect_callback``
@@ -62,7 +62,7 @@ class OneClientServer:
         self.writer = None
         # Client socket reader, or None if a client not connected.
         self.reader = None
-        # Task that is set done when a client is connected.
+        # Task that is set done when a client connects to this server.
         self.connected_task = asyncio.Future()
         # Task that is set done when the TCP/IP server is started.
         self.start_task = asyncio.create_task(self.start())
@@ -72,7 +72,7 @@ class OneClientServer:
 
     @property
     def connected(self):
-        """Return True if the command socket is connected.
+        """Return True if a client is connected to this socket.
         """
         return not (
             self.writer is None or self.writer.is_closing() or self.reader.at_eof()
@@ -81,7 +81,7 @@ class OneClientServer:
     async def set_reader_writer(self, reader, writer):
         """Set self.reader and self.writer.
 
-        Called when a client connects to the server.
+        Called when a client connects to this server.
 
         Parameters
         ----------
@@ -91,7 +91,7 @@ class OneClientServer:
             Socket writer.
         """
         if self.connected:
-            self.log.error("Rejecting connection; a` socket is already connected.")
+            self.log.error("Rejecting connection; a socket is already connected.")
             writer.close()
             return
         self.reader = reader
@@ -138,7 +138,8 @@ class OneClientServer:
         Always safe to call.
         """
         self.log.info("Closing the server.")
-        self.server.close()
+        if self.server is not None:
+            self.server.close()
         await self.close_client()
         if self.done_task.done():
             self.done_task.set_result(None)
