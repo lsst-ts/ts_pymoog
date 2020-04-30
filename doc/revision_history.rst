@@ -13,6 +13,8 @@ Changes:
 
 * The clearError command in the mock controller now transitions to STANDBY instead of OFFLINE/AVAILABLE.
   This matches a recent change to the rotator controller and a planned change to the hexapod controller.
+* Include conda package build configuration.
+* Added a Jenkinsfile to support continuous integration and to build conda packages.
 * Fixed a bug in `OneClientServer.close`: it would fail if called twice.
 
 Requires:
