@@ -6,6 +6,19 @@
 ts_hexrotcomm Revision History
 ##############################
 
+v0.5.0
+======
+
+Changes:
+
+* Make `BaseCsc` forward compatible with ts_xml 5.2 and with explicitly listing which generic topics are used.
+
+Requires:
+* ts_salobj 5
+* ts_idl 1
+* ts_xml 4.6
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+
 v0.4.0
 ======
 
