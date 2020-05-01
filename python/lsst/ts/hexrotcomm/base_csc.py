@@ -276,19 +276,6 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
                 if delay is not None:
                     await asyncio.sleep(delay)
 
-    # Unsupported standard CSC commands.
-    async def do_abort(self, data):
-        raise salobj.ExpectedError("Unsupported command")
-
-    async def do_setSimulationMode(self, data):
-        raise salobj.ExpectedError(
-            "Unsupported command: "
-            "simulation mode can only be set when starting the CSC."
-        )
-
-    async def do_setValue(self, data):
-        raise salobj.ExpectedError("Unsupported command")
-
     # Standard CSC commands.
     async def do_clearError(self, data):
         """Reset the FAULT state to STANDBY.
