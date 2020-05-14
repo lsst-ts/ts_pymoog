@@ -209,7 +209,7 @@ class BaseMockController(
 
     async def run_command(self, command):
         self.log.debug(
-            f"run_command: "
+            "run_command: "
             f"sync_pattern={hex(command.sync_pattern)}; "
             f"counter={command.counter}; "
             f"command={self.CommandCode(command.code)!r}; "

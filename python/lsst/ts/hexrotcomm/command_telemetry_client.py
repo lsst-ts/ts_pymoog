@@ -141,7 +141,7 @@ class CommandTelemetryClient:
 
         Always safe to call.
         """
-        self.log.debug(f"close()")
+        self.log.debug("close()")
         self.connect_task.cancel()
         self._basic_close()
         self.command_reader = None
