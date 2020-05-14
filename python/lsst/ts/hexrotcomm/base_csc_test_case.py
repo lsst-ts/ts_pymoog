@@ -184,8 +184,9 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
                 exe_name, str(index), "--simulate"
             )
         try:
-            async with salobj.Domain() as domain:
-                remote = salobj.Remote(domain=domain, name=name, index=index)
+            async with salobj.Domain() as domain, salobj.Remote(
+                domain=domain, name=name, index=index
+            ) as remote:
                 summaryState_data = await remote.evt_summaryState.next(
                     flush=False, timeout=60
                 )
