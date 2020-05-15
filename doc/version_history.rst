@@ -1,10 +1,10 @@
 .. py:currentmodule:: lsst.ts.hexrotcomm
 
-.. _lsst.ts.hexrotcomm.revision_history:
+.. _lsst.ts.hexrotcomm.version_history:
 
-################
-Revision History
-################
+###############
+Version History
+###############
 
 v0.5.1
 ======
