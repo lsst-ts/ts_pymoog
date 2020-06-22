@@ -208,7 +208,9 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
         """
         await self.make_csc(initial_state=salobj.State.OFFLINE)
         await self.assert_next_summary_state(salobj.State.OFFLINE)
-        await self.check_bad_commands(good_commands=("enterControl", "setLogLevel"))
+        await self.check_bad_commands(
+            good_commands=("enterControl", "setAuthList", "setLogLevel")
+        )
 
         # send enterControl; new state is STANDBY
         await self.remote.cmd_enterControl.start(timeout=STD_TIMEOUT)
@@ -217,7 +219,7 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
         self.assertEqual(self.csc.summary_state, salobj.State.STANDBY)
         await self.assert_next_summary_state(salobj.State.STANDBY)
         await self.check_bad_commands(
-            good_commands=("start", "exitControl", "setLogLevel")
+            good_commands=("start", "exitControl", "setAuthList", "setLogLevel")
         )
 
         # send start; new state is DISABLED
@@ -225,14 +227,16 @@ class BaseCscTestCase(metaclass=abc.ABCMeta):
         self.assertEqual(self.csc.summary_state, salobj.State.DISABLED)
         await self.assert_next_summary_state(salobj.State.DISABLED)
         await self.check_bad_commands(
-            good_commands=("enable", "standby", "setLogLevel")
+            good_commands=("enable", "standby", "setAuthList", "setLogLevel")
         )
 
         # send enable; new state is ENABLED
         await self.remote.cmd_enable.start(timeout=STD_TIMEOUT)
         self.assertEqual(self.csc.summary_state, salobj.State.ENABLED)
         await self.assert_next_summary_state(salobj.State.ENABLED)
-        good_enabled_commands = set(("disable", "setLogLevel")) | set(enabled_commands)
+        good_enabled_commands = set(("disable", "setAuthList", "setLogLevel")) | set(
+            enabled_commands
+        )
         await self.check_bad_commands(good_commands=good_enabled_commands)
 
         # send disable; new state is DISABLED
