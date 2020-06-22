@@ -6,12 +6,33 @@
 Version History
 ###############
 
+v0.6.0
+======
+
+Changes:
+
+* Update for compatibility with ts_salobj 6.
+
+Requires:
+
+* ts_salobj 5.11 - 6
+* ts_idl 1
+* ts_xml 4.6 - 6
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+
 v0.5.2
 ======
 
 Changes:
 
 * Add black to conda test dependencies
+
+Requires:
+
+* ts_salobj 5.11
+* ts_idl 1
+* ts_xml 4.6
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
 
 v0.5.1
 ======
