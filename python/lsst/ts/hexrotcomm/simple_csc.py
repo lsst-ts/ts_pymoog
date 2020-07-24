@@ -72,10 +72,6 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     """
 
     def __init__(self, initial_state=salobj.State.OFFLINE, simulation_mode=0):
-        self._initial_state = salobj.State(initial_state)
-        if simulation_mode not in (0, 1):
-            raise ValueError(f"simulation_mode = {simulation_mode}; must be 0 or 1")
-        self.simulation_mode = simulation_mode
         self.server = None
         self.mock_ctrl = None
         # Set this to 2 when trackStart is called, then decrement
