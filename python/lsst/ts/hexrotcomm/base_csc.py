@@ -48,7 +48,7 @@ StateCscState = {
 CscStateState = dict((value, key) for key, value in StateCscState.items())
 
 
-class BaseCsc(salobj.BaseCsc, metaclass=abc.ABCMeta):
+class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
     """Base CSC for talking to Moog hexpod or rotator controllers.
 
     Parameters
@@ -68,6 +68,17 @@ class BaseCsc(salobj.BaseCsc, metaclass=abc.ABCMeta):
         Configuration structure.
     TelemetryClass : `ctypes.Structure`
         Telemetry structure.
+    schema_path : `str` or `pathlib.Path`
+        Path to a schema file used to validate configuration files
+        The recommended path is ``<package_root>/"schema"/f"{name}.yaml"``
+        for example:
+
+            schema_path = pathlib.Path(__file__).resolve().parents[4] \
+                / "schema" / f"{name}.yaml"
+    config_dir : `str`, optional
+        Directory of configuration files, or None for the standard
+        configuration directory (obtained from `_get_default_config_dir`).
+        This is provided for unit testing.
     initial_state : `lsst.ts.salobj.State` or `int` (optional)
         The initial state of the CSC. Ignored (other than checking
         that it is a valid value) except in simulation mode,
@@ -103,6 +114,8 @@ class BaseCsc(salobj.BaseCsc, metaclass=abc.ABCMeta):
         CommandCode,
         ConfigClass,
         TelemetryClass,
+        schema_path,
+        config_dir=None,
         initial_state=salobj.State.OFFLINE,
         simulation_mode=0,
     ):
@@ -125,12 +138,18 @@ class BaseCsc(salobj.BaseCsc, metaclass=abc.ABCMeta):
         super().__init__(
             name=name,
             index=index,
+            schema_path=schema_path,
+            config_dir=config_dir,
             initial_state=initial_state,
             simulation_mode=simulation_mode,
         )
         # start needs to know the simulation mode before
         # super().start() sets it.
         self.evt_simulationMode.set(mode=simulation_mode)
+
+    @staticmethod
+    def get_config_pkg():
+        return "ts_config_ocs"
 
     @property
     def summary_state(self):
@@ -173,6 +192,9 @@ class BaseCsc(salobj.BaseCsc, metaclass=abc.ABCMeta):
             await self.mock_ctrl.close()
         if self.server is not None:
             await self.server.close()
+
+    async def configure(self, config):
+        pass
 
     async def implement_simulation_mode(self, simulation_mode):
         # Test the value of simulation_mode in the constructor, instead.

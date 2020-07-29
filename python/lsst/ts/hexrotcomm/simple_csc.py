@@ -21,6 +21,8 @@
 
 __all__ = ["SimpleCsc"]
 
+import pathlib
+
 from lsst.ts import salobj
 from lsst.ts import hexrotcomm
 from lsst.ts.idl.enums import Rotator
@@ -83,6 +85,9 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         self._prev_flags_tracking_success = False
         self._prev_flags_tracking_lost = False
 
+        schema_path = (
+            pathlib.Path(__file__).parents[4].joinpath("schema", "Rotator.yaml")
+        )
         super().__init__(
             name="Rotator",
             index=0,
@@ -90,6 +95,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
             CommandCode=simple_mock_controller.SimpleCommandCode,
             ConfigClass=simple_mock_controller.SimpleConfig,
             TelemetryClass=simple_mock_controller.SimpleTelemetry,
+            schema_path=schema_path,
             initial_state=initial_state,
             simulation_mode=simulation_mode,
         )
