@@ -6,6 +6,20 @@
 Version History
 ###############
 
+v0.7.0
+======
+
+Changes:
+
+* Make BaseCsc a configurable CSC.
+
+Requires:
+
+* ts_salobj 5.11 - 6
+* ts_idl 1
+* ts_xml 4.6 - 6
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+
 v0.6.0
 ======
 
