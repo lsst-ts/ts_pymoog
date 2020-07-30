@@ -23,7 +23,6 @@ __all__ = ["BaseCsc"]
 
 import abc
 import asyncio
-import sys
 
 from lsst.ts import salobj
 from lsst.ts.idl.enums import Rotator
@@ -49,7 +48,7 @@ StateCscState = {
 CscStateState = dict((value, key) for key, value in StateCscState.items())
 
 
-class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
+class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
     """Base CSC for talking to Moog hexpod or rotator controllers.
 
     Parameters
@@ -69,6 +68,17 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         Configuration structure.
     TelemetryClass : `ctypes.Structure`
         Telemetry structure.
+    schema_path : `str` or `pathlib.Path`
+        Path to a schema file used to validate configuration files
+        The recommended path is ``<package_root>/"schema"/f"{name}.yaml"``
+        for example:
+
+            schema_path = pathlib.Path(__file__).resolve().parents[4] \
+                / "schema" / f"{name}.yaml"
+    config_dir : `str`, optional
+        Directory of configuration files, or None for the standard
+        configuration directory (obtained from `_get_default_config_dir`).
+        This is provided for unit testing.
     initial_state : `lsst.ts.salobj.State` or `int` (optional)
         The initial state of the CSC. Ignored (other than checking
         that it is a valid value) except in simulation mode,
@@ -88,11 +98,12 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
 
     This CSC is unusual in several respect:
 
-    * It acts as a server (not a client) for a low level controller
-      (because that is how the low level controller is written).
-    * The low level controller maintains the summary state and detailed state
-      (that's why this code inherits from Controller instead of BaseCsc).
-    * The simulation mode can only be set at construction time.
+    * It acts as a server (not a client) for a low level controller,
+      because that is how the low level controller is written.
+    * The low level controller maintains the summary state.
+      As a result this code has to override some methods of its base class,
+      and it cannot allow TCP/IP communication parameters to be part of
+      the configuration specified in the ``start`` command.
     """
 
     def __init__(
@@ -104,13 +115,20 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         CommandCode,
         ConfigClass,
         TelemetryClass,
+        schema_path,
+        config_dir=None,
         initial_state=salobj.State.OFFLINE,
         simulation_mode=0,
     ):
-        self._initial_state = salobj.State(initial_state)
+        # Check the value of initial_state, then ignore it if not simulating
+        initial_state = salobj.State(initial_state)
         if simulation_mode not in (0, 1):
             raise ValueError(f"simulation_mode = {simulation_mode}; must be 0 or 1")
-        self.simulation_mode = simulation_mode
+        if simulation_mode == 0:
+            # Normal mode: start in initial state OFFLINE,
+            # then when connected to the low-level controller,
+            # report the state of the low-level controller.
+            initial_state = salobj.State.OFFLINE
         self.server = None
         self.CommandCode = CommandCode
         self.ConfigClass = ConfigClass
@@ -118,18 +136,36 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         self.sync_pattern = sync_pattern
         self.mock_ctrl = None
         self._command_lock = asyncio.Lock()
-        super().__init__(name=name, index=index, do_callbacks=True)
-        self.heartbeat_interval = 1
-        self.heartbeat_task = asyncio.ensure_future(self.heartbeat_loop())
+        super().__init__(
+            name=name,
+            index=index,
+            schema_path=schema_path,
+            config_dir=config_dir,
+            initial_state=initial_state,
+            simulation_mode=simulation_mode,
+        )
+        # start needs to know the simulation mode before
+        # super().start() sets it.
+        self.evt_simulationMode.set(mode=simulation_mode)
+
+    @staticmethod
+    def get_config_pkg():
+        return "ts_config_ocs"
 
     @property
     def summary_state(self):
         """Return the current summary state as a salobj.State,
         or OFFLINE if unknown.
         """
-        if self.server is None or not self.server.connected:
-            return salobj.State.OFFLINE
-        return StateCscState.get(int(self.server.telemetry.state), salobj.State.OFFLINE)
+        if self.server is not None and self.server.connected:
+            return StateCscState.get(
+                int(self.server.telemetry.state), salobj.State.OFFLINE
+            )
+        elif not self.start_task.done():
+            # Starting up; return the initial summary state
+            return super().summary_state
+        # Disconnected, return OFFLINE
+        return salobj.State.OFFLINE
 
     async def start(self):
         await super().start()
@@ -147,18 +183,23 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
         )
         await self.server.start_task
         if simulating:
-            initial_ctrl_state = CscStateState[self._initial_state]
+            initial_ctrl_state = CscStateState[self.summary_state]
             self.mock_ctrl = self.make_mock_controller(initial_ctrl_state)
             await self.mock_ctrl.connect_task
-        else:
-            self.evt_summaryState.set_put(summaryState=salobj.State.OFFLINE)
 
     async def close_tasks(self):
-        self.heartbeat_task.cancel()
+        await super().close_tasks()
         if self.mock_ctrl is not None:
             await self.mock_ctrl.close()
         if self.server is not None:
             await self.server.close()
+
+    async def configure(self, config):
+        pass
+
+    async def implement_simulation_mode(self, simulation_mode):
+        # Test the value of simulation_mode in the constructor, instead.
+        pass
 
     @abc.abstractmethod
     def make_mock_controller(self, initial_ctrl_state):
@@ -415,16 +456,3 @@ class BaseCsc(salobj.Controller, metaclass=abc.ABCMeta):
             TCP/IP server.
         """
         raise NotImplementedError()
-
-    async def heartbeat_loop(self):
-        """Output heartbeat at regular intervals.
-        """
-        while True:
-            try:
-                await asyncio.sleep(self.heartbeat_interval)
-                self.evt_heartbeat.put()
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                # don't use the log because it also uses DDS messaging
-                print(f"Heartbeat output failed: {e!r}", file=sys.stderr)
