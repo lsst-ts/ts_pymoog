@@ -98,11 +98,12 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
 
     This CSC is unusual in several respect:
 
-    * It acts as a server (not a client) for a low level controller
-      (because that is how the low level controller is written).
-    * The low level controller maintains the summary state and detailed state
-      (that's why this code inherits from Controller instead of BaseCsc).
-    * The simulation mode can only be set at construction time.
+    * It acts as a server (not a client) for a low level controller,
+      because that is how the low level controller is written.
+    * The low level controller maintains the summary state.
+      As a result this code has to override some methods of its base class,
+      and it cannot allow TCP/IP communication parameters to be part of
+      the configuration specified in the ``start`` command.
     """
 
     def __init__(
