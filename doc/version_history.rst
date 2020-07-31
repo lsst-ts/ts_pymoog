@@ -6,12 +6,32 @@
 Version History
 ###############
 
+v0.8.0
+======
+
+Backward-incompatible changes:
+
+* Remove ``BaseCscTestCase`` and ``CscCommander`` classes; use the versions in ts_salobj instead.
+* Bug fix: `BaseCsc.get_config_pkg` returned "ts_config_ocs" instead of "ts_config_mttcs".
+
+Changes:
+
+* Add missing call to ``begin_start`` to `BaseCsc.do_start`.
+* Make `BaseCsc.fault` raise `NotImplementedError`, since the low-level controller maintains the summary state and offers no command to transition to the FAULT state.
+
+Requires:
+
+* ts_salobj 5.11 - 6
+* ts_idl 1
+* ts_xml 4.6 - 6
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+
 v0.7.0
 ======
 
 Changes:
 
-* Make BaseCsc a configurable CSC.
+* Make `BaseCsc` a configurable CSC.
 
 Requires:
 
