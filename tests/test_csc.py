@@ -19,6 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import asyncio
+import pathlib
 import unittest
 
 import asynctest
@@ -29,12 +30,61 @@ from lsst.ts.idl.enums import Rotator
 
 STD_TIMEOUT = 5  # timeout for command ack
 
+LOCAL_CONFIG_DIR = pathlib.Path(__file__).parent / "data" / "config"
 
-class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
-    def basic_make_csc(self, initial_state=salobj.State.OFFLINE, simulation_mode=1):
+
+class TestSimpleCsc(salobj.BaseCscTestCase, asynctest.TestCase):
+    def basic_make_csc(
+        self, config_dir=None, initial_state=salobj.State.OFFLINE, simulation_mode=1
+    ):
         return hexrotcomm.SimpleCsc(
-            initial_state=initial_state, simulation_mode=simulation_mode
+            initial_state=initial_state,
+            simulation_mode=simulation_mode,
+            config_dir=config_dir,
         )
+
+    async def test_constructor_errors(self):
+        for bad_initial_state in (0, max(salobj.State) + 1):
+            with self.assertRaises(ValueError):
+                hexrotcomm.SimpleCsc(
+                    initial_state=bad_initial_state, simulation_mode=1, config_dir=None,
+                )
+
+        for bad_simulation_mode in (-1, 2):
+            with self.assertRaises(ValueError):
+                hexrotcomm.SimpleCsc(
+                    initial_state=bad_initial_state,
+                    simulation_mode=bad_simulation_mode,
+                    config_dir=None,
+                )
+
+        with self.assertRaises(ValueError):
+            hexrotcomm.SimpleCsc(
+                initial_state=salobj.State.OFFLINE,
+                simulation_mode=1,
+                config_dir="no_such_directory",
+            )
+
+    async def test_invalid_config(self):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            simulation_mode=1,
+            config_dir=LOCAL_CONFIG_DIR,
+        ):
+
+            # Try a config file that has invalid data.
+            # The command should fail and the summary state remain in STANDBY.
+            with salobj.assertRaisesAckError():
+                await self.remote.cmd_start.set_start(
+                    settingsToApply="invalid.yaml", timeout=STD_TIMEOUT
+                )
+            self.assertEqual(self.csc.summary_state, salobj.State.STANDBY)
+
+            # Now try a valid config file
+            await self.remote.cmd_start.set_start(
+                settingsToApply="valid.yaml", timeout=STD_TIMEOUT
+            )
+            self.assertEqual(self.csc.summary_state, salobj.State.DISABLED)
 
     async def move_sequentially(self, *positions, delay=None):
         """Move sequentially to different positions, in order to test
@@ -63,62 +113,75 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
         """Test the move command.
         """
         destination = 2  # a small move so the test runs quickly
-        await self.make_csc(initial_state=salobj.State.ENABLED)
-        await self.assert_next_controller_state(
-            controllerState=Rotator.ControllerState.ENABLED
-        )
-        data = await self.remote.tel_Application.next(flush=True, timeout=STD_TIMEOUT)
-        self.assertAlmostEqual(data.Demand, 0)
-        await self.remote.cmd_move.set_start(position=destination, timeout=STD_TIMEOUT)
-        data = await self.remote.tel_Application.next(flush=True, timeout=STD_TIMEOUT)
-        self.assertAlmostEqual(data.Demand, destination)
+        async with self.make_csc(initial_state=salobj.State.ENABLED, simulation_mode=1):
+            await self.assert_next_sample(
+                topic=self.remote.evt_controllerState,
+                controllerState=Rotator.ControllerState.ENABLED,
+            )
+            data = await self.remote.tel_Application.next(
+                flush=True, timeout=STD_TIMEOUT
+            )
+            self.assertAlmostEqual(data.Demand, 0)
+            await self.remote.cmd_move.set_start(
+                position=destination, timeout=STD_TIMEOUT
+            )
+            data = await self.remote.tel_Application.next(
+                flush=True, timeout=STD_TIMEOUT
+            )
+            self.assertAlmostEqual(data.Demand, destination)
 
     async def test_run_multiple_commands(self):
         """Test BaseCsc.run_multiple_commands.
         """
         target_positions = (1, 2, 3)  # Small moves so the test runs quickly
-        await self.make_csc(initial_state=salobj.State.ENABLED)
-        await self.assert_next_controller_state(
-            controllerState=Rotator.ControllerState.ENABLED
-        )
-        telemetry_delay = self.csc.mock_ctrl.telemetry_interval * 3
+        async with self.make_csc(initial_state=salobj.State.ENABLED, simulation_mode=1):
+            await self.assert_next_sample(
+                topic=self.remote.evt_controllerState,
+                controllerState=Rotator.ControllerState.ENABLED,
+            )
+            telemetry_delay = self.csc.mock_ctrl.telemetry_interval * 3
 
-        # Record demand positions from the `application` telemetry topic.
-        demand_positions = []
+            # Record demand positions from the `application` telemetry topic.
+            demand_positions = []
 
-        def application_callback(data):
-            if data.Demand not in demand_positions:
-                demand_positions.append(data.Demand)
+            def application_callback(data):
+                if data.Demand not in demand_positions:
+                    demand_positions.append(data.Demand)
 
-        self.remote.tel_Application.callback = application_callback
+            self.remote.tel_Application.callback = application_callback
 
-        # Wait for initial telemetry.
-        await asyncio.sleep(telemetry_delay)
+            # Wait for initial telemetry.
+            await asyncio.sleep(telemetry_delay)
 
-        # Start moving to the specified positions
-        task1 = asyncio.ensure_future(
-            self.move_sequentially(*target_positions, delay=telemetry_delay)
-        )
-        # Give this task a chance to start running
-        await asyncio.sleep(0.01)
+            # Start moving to the specified positions
+            task1 = asyncio.ensure_future(
+                self.move_sequentially(*target_positions, delay=telemetry_delay)
+            )
+            # Give this task a chance to start running
+            await asyncio.sleep(0.01)
 
-        # Try to move to yet another position; this should be delayed
-        # until the first set of moves is finished.
-        other_move = self.csc.cmd_move.DataType()
-        other_move.position = 1 + max(*target_positions)
-        await self.csc.do_move(other_move)
+            # Try to move to yet another position; this should be delayed
+            # until the first set of moves is finished.
+            other_move = self.csc.cmd_move.DataType()
+            other_move.position = 1 + max(*target_positions)
+            await self.csc.do_move(other_move)
 
-        # task1 should have finished before the do_move command.
-        self.assertTrue(task1.done())
+            # task1 should have finished before the do_move command.
+            self.assertTrue(task1.done())
 
-        # Wait for final telemetry.
-        await asyncio.sleep(telemetry_delay)
+            # Wait for final telemetry.
+            await asyncio.sleep(telemetry_delay)
 
-        expected_positions = [0] + list(target_positions) + [other_move.position]
-        self.assertEqual(expected_positions, demand_positions)
+            expected_positions = [0] + list(target_positions) + [other_move.position]
+            self.assertEqual(expected_positions, demand_positions)
 
     async def test_standard_state_transitions(self):
-        await self.check_standard_state_transitions(enabled_commands=("move",))
+        async with self.make_csc(initial_state=salobj.State.STANDBY, simulation_mode=1):
+            await self.check_standard_state_transitions(enabled_commands=("move",))
+
+            # Check that the fault method is not implemented
+            with self.assertRaises(NotImplementedError):
+                self.csc.fault(code=1, report="this should raise NotImplementedError")
 
 
 if __name__ == "__main__":
