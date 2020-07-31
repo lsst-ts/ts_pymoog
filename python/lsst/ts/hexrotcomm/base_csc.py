@@ -82,8 +82,9 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
     initial_state : `lsst.ts.salobj.State` or `int` (optional)
         The initial state of the CSC. Ignored (other than checking
         that it is a valid value) except in simulation mode,
-        because in normal operation the initial state is the current state
-        of the controller. This is provided for unit testing.
+        because in normal operation the initial state OFFLINE,
+        followed by the current state of the controller (if different).
+        This is provided for unit testing.
     simulation_mode : `int` (optional)
         Simulation mode. Allowed values:
 
