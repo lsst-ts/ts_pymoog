@@ -82,8 +82,9 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
     initial_state : `lsst.ts.salobj.State` or `int` (optional)
         The initial state of the CSC. Ignored (other than checking
         that it is a valid value) except in simulation mode,
-        because in normal operation the initial state is the current state
-        of the controller. This is provided for unit testing.
+        because in normal operation the initial state OFFLINE,
+        followed by the current state of the controller (if different).
+        This is provided for unit testing.
     simulation_mode : `int` (optional)
         Simulation mode. Allowed values:
 
@@ -104,6 +105,8 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
       As a result this code has to override some methods of its base class,
       and it cannot allow TCP/IP communication parameters to be part of
       the configuration specified in the ``start`` command.
+    * Calls no ``begin_<command>`` or ``end_<command>`` methods
+      except `begin_start`.
     """
 
     def __init__(
@@ -150,7 +153,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
 
     @staticmethod
     def get_config_pkg():
-        return "ts_config_ocs"
+        return "ts_config_mttcs"
 
     @property
     def summary_state(self):
@@ -196,6 +199,15 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
 
     async def configure(self, config):
         pass
+
+    def fault(self, code, report, traceback=""):
+        """Warning: the fault method is not support in this class.
+
+        The problem is that the summary state is maintained by
+        the low-level controller and the CSC has no way to reliably
+        send the low-level controller to FAULT state.
+        """
+        raise NotImplementedError("Not implemented")
 
     async def implement_simulation_mode(self, simulation_mode):
         # Test the value of simulation_mode in the constructor, instead.
@@ -403,6 +415,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         supplied file name into a file on an nfs-mounted partition.
         I hope we won't need to do that, as it seems complicated.
         """
+        await self.begin_start(data)
         self.assert_summary_state(salobj.State.STANDBY, isbefore=True)
         await self.run_command(
             code=self.CommandCode.SET_STATE, param1=enums.SetStateParam.START

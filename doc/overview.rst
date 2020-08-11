@@ -17,7 +17,6 @@ Contents include:
 * `CommandTelemetryServer`: A TCP/IP server that communicates with the low level controllers to send commands and receive telemetry.
 * `Command` and `Header`: C structures used for communication.
 * `SimpleMockController`: a simple mock controller for testing `BaseCsc` and `CommandTelemetryServer`.
-* `CscCommander`: a base class for simple command-line scripts that control a rotator or hexapod CSC.
 
 Note: Moog, the vendor that provided the low level controllers, also provided CSCs for the camera rotator and two hexapods.
 Moog implemented these as a single C++ program called the "wrapper" that acts as all three CSCs at once.
