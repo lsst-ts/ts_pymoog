@@ -82,7 +82,7 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         if self.mock_ctrl is not None:
             await self.mock_ctrl.close()
         for writer in self.writers:
-            writer.close()
+            await hexrotcomm.close_stream_writer(writer)
         await self.server.close()
 
     async def make_controller(self, check_connected=True):
@@ -315,7 +315,7 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         await self.assert_next_connected(command=True, telemetry=False)
 
         await self.check_extra_connection(self.open_command_socket)
-        command_writer.close()
+        await hexrotcomm.close_stream_writer(command_writer)
         await self.assert_next_connected(command=False, telemetry=False)
 
         # Connect and disconnect the telemetry socket
@@ -324,7 +324,7 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
 
         await self.check_extra_connection(self.open_telemetry_socket)
 
-        telemetry_writer.close()
+        await hexrotcomm.close_stream_writer(telemetry_writer)
         await self.assert_next_connected(command=False, telemetry=False)
 
         # Connect both, then disconnect each
@@ -336,9 +336,9 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         await self.check_extra_connection(self.open_command_socket)
         await self.check_extra_connection(self.open_telemetry_socket)
 
-        command_writer.close()
+        await hexrotcomm.close_stream_writer(command_writer)
         await self.assert_next_connected(command=False, telemetry=True)
-        telemetry_writer.close()
+        await hexrotcomm.close_stream_writer(telemetry_writer)
         await self.assert_next_connected(command=False, telemetry=False)
 
     async def test_failed_callbacks(self):
@@ -368,7 +368,7 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         rejected_reader, rejected_writer = await connect_coroutine()
         await asyncio.wait_for(rejected_reader.read(1000), STD_TIMEOUT)
         self.assertTrue(rejected_reader.at_eof())
-        rejected_writer.close()
+        await hexrotcomm.close_stream_writer(rejected_writer)
         with self.assertRaises(asyncio.TimeoutError):
             await asyncio.wait_for(self.connect_queue.get(), timeout=STD_TIMEOUT)
 

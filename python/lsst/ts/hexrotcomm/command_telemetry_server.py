@@ -249,15 +249,18 @@ class CommandTelemetryServer:
         """
         # We do not expect to read any data, but we may as well accept it
         # if some comes in.
-        while True:
-            await self.command_server.reader.read(1000)
-            if self.command_server.reader.at_eof():
-                # reader closed; close the writer
-                await self.command_server.close_client()
-                return
-            else:
-                self.log.warning("Unexpected data read from the command socket.")
-                await asyncio.sleep(0.01)
+        try:
+            while True:
+                await self.command_server.reader.read(1000)
+                if self.command_server.reader.at_eof():
+                    self.log.info("Command reader at eof; closing client")
+                    break
+                else:
+                    self.log.warning("Unexpected data read from the command socket.")
+                    await asyncio.sleep(0.01)
+        except ConnectionError:
+            self.log.info("Command reader disconnected; closing client")
+        await self.command_server.close_client()
 
     async def wait_connected(self):
         """Wait for command and telemetry sockets to be connected."""
@@ -287,10 +290,14 @@ class CommandTelemetryServer:
 
     async def close(self):
         """Close everything."""
-        self.monitor_command_reader_task.cancel()
-        self.read_telemetry_and_config_task.cancel()
-        await self.command_server.close()
-        await self.telemetry_server.close()
-        self.call_connect_callback()
-        if not self.done_task.done():
-            self.done_task.set_result(None)
+        try:
+            self.monitor_command_reader_task.cancel()
+            self.read_telemetry_and_config_task.cancel()
+            await self.command_server.close()
+            await self.telemetry_server.close()
+            self.call_connect_callback()
+        except Exception:
+            self.log.exception("close failed; setting done_task done anyway.")
+        finally:
+            if not self.done_task.done():
+                self.done_task.set_result(None)

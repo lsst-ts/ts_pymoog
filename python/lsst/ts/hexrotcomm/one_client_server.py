@@ -23,6 +23,8 @@ __all__ = ["OneClientServer"]
 
 import asyncio
 
+from . import utils
+
 
 class OneClientServer:
     """A TCP/IP socket server that serves a single client.
@@ -92,7 +94,7 @@ class OneClientServer:
         """
         if self.connected:
             self.log.error("Rejecting connection; a socket is already connected.")
-            writer.close()
+            await utils.close_stream_writer(writer)
             return
         self.reader = reader
         self.writer = writer
@@ -104,11 +106,13 @@ class OneClientServer:
         """
         if self.server is not None:
             raise RuntimeError("Cannot call start more than once.")
+        self.log.debug(f"Starting server")
         self.server = await asyncio.start_server(
             self.set_reader_writer, host=self.host, port=self.port
         )
         if self.port == 0:
             self.port = self.server.sockets[0].getsockname()[1]
+        self.log.info(f"Server running: host={self.host}; port={self.port}")
 
     def call_connect_callback(self):
         """Call the connect_callback if connection state has changed.
@@ -125,21 +129,34 @@ class OneClientServer:
     async def close_client(self):
         """Close the connected client socket, if any.
         """
-        self.log.info("Closing the client socket.")
-        if self.writer is None:
-            return
-        self.writer.close()
-        self.connected_task = asyncio.Future()
-        self.call_connect_callback()
+        try:
+            self.log.info("Closing the client socket.")
+            if self.writer is None:
+                return
+            # Work around a bug in Python 3.7.6: if a StreamWriter is
+            # being closed then the next call to wait_closed on that writer
+            # may raise asyncio.CancelledError.
+            try:
+                await utils.close_stream_writer(self.writer)
+            except asyncio.CancelledError:
+                self.log.warning("close_client cancelled; continuing")
+            self.connected_task = asyncio.Future()
+            self.call_connect_callback()
+        except Exception:
+            self.log.exception("close_client failed; continuing")
 
     async def close(self):
         """Close socket server and client socket and set the done_task done.
 
         Always safe to call.
         """
-        self.log.info("Closing the server.")
-        if self.server is not None:
-            self.server.close()
-        await self.close_client()
-        if self.done_task.done():
-            self.done_task.set_result(None)
+        try:
+            self.log.info("Closing the server.")
+            if self.server is not None:
+                self.server.close()
+            await self.close_client()
+        except Exception:
+            self.log.exception("close failed; continuing")
+        finally:
+            if self.done_task.done():
+                self.done_task.set_result(None)
