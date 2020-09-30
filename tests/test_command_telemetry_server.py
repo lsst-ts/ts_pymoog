@@ -36,6 +36,8 @@ RECONNECT_TIMEOUT = (
     hexrotcomm.SimpleMockController.connect_retry_interval * 3 + STD_TIMEOUT
 )
 
+logging.basicConfig()
+
 
 class CommandTelemetryServerTestCase(asynctest.TestCase):
     """Test CommandTelemetryServer by connecting it to a SimpleMockController.
@@ -60,7 +62,6 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
 
         log = logging.getLogger()
         log.setLevel(logging.INFO)
-        log.addHandler(logging.StreamHandler())
         self.server = hexrotcomm.CommandTelemetryServer(
             host=hexrotcomm.LOCAL_HOST,
             log=log,
