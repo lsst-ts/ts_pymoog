@@ -1,4 +1,6 @@
 setupRequired(sconsUtils)
+setupRequired(ts_idl)
+setupRequired(ts_salobj)
 
 envPrepend(PATH, ${PRODUCT_DIR}/bin)
 

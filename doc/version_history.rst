@@ -6,6 +6,19 @@
 Version History
 ###############
 
+v0.9.0
+======
+
+* Add `close_stream_writer` function that closes an `asyncio.StreamWriter` and waits for it to close.
+* Update code to wait for stream writers to close.
+
+Requires:
+
+* ts_salobj 5.11 - 6
+* ts_idl 1 (with salobj 5) or 2 (with salobj 6)
+* ts_xml 4.6 - 6
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+
 v0.8.0
 ======
 
@@ -22,7 +35,7 @@ Changes:
 Requires:
 
 * ts_salobj 5.11 - 6
-* ts_idl 1
+* ts_idl 1 (with salobj 5) or 2 (with salobj 6)
 * ts_xml 4.6 - 6
 * Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
 
@@ -36,7 +49,7 @@ Changes:
 Requires:
 
 * ts_salobj 5.11 - 6
-* ts_idl 1
+* ts_idl 1 (with salobj 5) or 2 (with salobj 6)
 * ts_xml 4.6 - 6
 * Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
 
@@ -50,7 +63,7 @@ Changes:
 Requires:
 
 * ts_salobj 5.11 - 6
-* ts_idl 1
+* ts_idl 1 (with salobj 5) or 2 (with salobj 6)
 * ts_xml 4.6 - 6
 * Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
 

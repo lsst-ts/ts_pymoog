@@ -19,9 +19,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["read_into", "write_from"]
+__all__ = ["close_stream_writer", "read_into", "write_from"]
 
 import ctypes
+
+
+async def close_stream_writer(writer):
+    """Close an asyncio.StreamWriter and wait for it to finish closing.
+
+    Safe to call even if the stream is closed or being closed, except...
+
+    Warning: this may raise `asyncio.CancelledError` if the stream
+    is already being closed. I suspect this is a bug in Python 3.7.6.
+    """
+    writer.close()
+    await writer.wait_closed()
 
 
 async def read_into(reader, struct):
