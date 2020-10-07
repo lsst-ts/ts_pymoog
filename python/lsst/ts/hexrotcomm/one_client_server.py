@@ -106,7 +106,7 @@ class OneClientServer:
         """
         if self.server is not None:
             raise RuntimeError("Cannot call start more than once.")
-        self.log.debug(f"Starting server")
+        self.log.debug("Starting server")
         self.server = await asyncio.start_server(
             self.set_reader_writer, host=self.host, port=self.port
         )
