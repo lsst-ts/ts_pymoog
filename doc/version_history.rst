@@ -6,6 +6,26 @@
 Version History
 ###############
 
+v0.10.0
+=======
+
+* Update for ts_salobj 6.1.
+* Update the handling of initial_state in `BaseCsc`:
+
+    * If initial_state != OFFLINE then report all transitional summary states and controller states at startup.
+    * Require initial_state = OFFLINE unless simulating.
+* Add `BaseCscTestCase` with overridden versions of:
+
+    * `BaseCscTestCase.make_csc`: read all but the final controller state at startup,
+    * `BaseCscTestCase.check_bin_script`: set ``default_initial_state``.
+
+Requires:
+
+* ts_salobj 6.1
+* ts_idl 2
+* ts_xml 4.6 - 6
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+
 v0.9.0
 ======
 
@@ -14,7 +34,7 @@ v0.9.0
 
 Requires:
 
-* ts_salobj 5.11 - 6
+* ts_salobj 5.11 - 6.0
 * ts_idl 1 (with salobj 5) or 2 (with salobj 6)
 * ts_xml 4.6 - 6
 * Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
