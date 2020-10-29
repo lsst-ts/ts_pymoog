@@ -33,7 +33,7 @@ STD_TIMEOUT = 5  # timeout for command ack
 LOCAL_CONFIG_DIR = pathlib.Path(__file__).parent / "data" / "config"
 
 
-class TestSimpleCsc(salobj.BaseCscTestCase, asynctest.TestCase):
+class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
     def basic_make_csc(
         self, config_dir=None, initial_state=salobj.State.OFFLINE, simulation_mode=1
     ):
@@ -114,6 +114,7 @@ class TestSimpleCsc(salobj.BaseCscTestCase, asynctest.TestCase):
         """
         destination = 2  # a small move so the test runs quickly
         async with self.make_csc(initial_state=salobj.State.ENABLED, simulation_mode=1):
+            await self.assert_next_summary_state(salobj.State.ENABLED)
             await self.assert_next_sample(
                 topic=self.remote.evt_controllerState,
                 controllerState=Rotator.ControllerState.ENABLED,
