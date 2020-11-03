@@ -83,11 +83,18 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         This is provided for unit testing.
     initial_state : `lsst.ts.salobj.State` or `int` (optional)
         The initial state of the CSC.
+        Must be `lsst.ts.salobj.State.OFFLINE` if ``simulation_mode = 0``.
     simulation_mode : `int` (optional)
         Simulation mode. Allowed values:
 
         * 0: regular operation.
         * 1: simulation: use a mock low level controller.
+
+    Raises
+    ------
+    ValueError
+        If ``initial_state != lsst.ts.salobj.State.OFFLINE``
+        and not simulating (``simulation_mode = 0``).
 
     Notes
     -----
@@ -125,6 +132,11 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
     ):
         if simulation_mode not in (0, 1):
             raise ValueError(f"simulation_mode = {simulation_mode}; must be 0 or 1")
+        if initial_state != salobj.State.OFFLINE and simulation_mode != 1:
+            raise ValueError(
+                f"initial_state = {initial_state!r} "
+                f"must be {salobj.State.OFFLINE!r} if not simulating"
+            )
         self.server = None
         self.CommandCode = CommandCode
         self.ConfigClass = ConfigClass

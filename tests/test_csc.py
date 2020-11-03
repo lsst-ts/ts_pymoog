@@ -46,16 +46,13 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
     async def test_constructor_errors(self):
         for bad_initial_state in (0, max(salobj.State) + 1):
             with self.assertRaises(ValueError):
-                hexrotcomm.SimpleCsc(
-                    initial_state=bad_initial_state, simulation_mode=1, config_dir=None,
-                )
+                hexrotcomm.SimpleCsc(initial_state=bad_initial_state, simulation_mode=1)
 
         for bad_simulation_mode in (-1, 2):
             with self.assertRaises(ValueError):
                 hexrotcomm.SimpleCsc(
                     initial_state=bad_initial_state,
                     simulation_mode=bad_simulation_mode,
-                    config_dir=None,
                 )
 
         with self.assertRaises(ValueError):
@@ -64,6 +61,14 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
                 simulation_mode=1,
                 config_dir="no_such_directory",
             )
+
+        for bad_initial_state in salobj.State:
+            if bad_initial_state == salobj.State.OFFLINE:
+                continue
+            with self.assertRaises(ValueError):
+                hexrotcomm.SimpleCsc(
+                    initial_state=bad_initial_state, simulation_mode=0,
+                )
 
     async def test_invalid_config(self):
         async with self.make_csc(
