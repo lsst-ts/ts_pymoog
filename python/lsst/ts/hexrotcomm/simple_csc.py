@@ -77,6 +77,8 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     * Application
     """
 
+    valid_simulation_modes = [0, 1]
+
     def __init__(
         self, config_dir=None, initial_state=salobj.State.OFFLINE, simulation_mode=0
     ):
