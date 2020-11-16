@@ -25,7 +25,7 @@ import abc
 import asyncio
 
 from lsst.ts import salobj
-from lsst.ts.idl.enums import MTRotator
+from lsst.ts.idl.enums.MTRotator import ControllerState, OfflineSubstate
 from . import enums
 from . import constants
 from . import structs
@@ -36,11 +36,11 @@ from . import command_telemetry_server
 # The names match but the numeric values do not.
 # Note that MTRotator and MTHexapod values match, so I just picked one.
 ControllerStateCscState = {
-    MTRotator.ControllerState.OFFLINE: salobj.State.OFFLINE,
-    MTRotator.ControllerState.STANDBY: salobj.State.STANDBY,
-    MTRotator.ControllerState.DISABLED: salobj.State.DISABLED,
-    MTRotator.ControllerState.ENABLED: salobj.State.ENABLED,
-    MTRotator.ControllerState.FAULT: salobj.State.FAULT,
+    ControllerState.OFFLINE: salobj.State.OFFLINE,
+    ControllerState.STANDBY: salobj.State.STANDBY,
+    ControllerState.DISABLED: salobj.State.DISABLED,
+    ControllerState.ENABLED: salobj.State.ENABLED,
+    ControllerState.FAULT: salobj.State.FAULT,
 }
 
 # Dict of CSC state: controller state.
@@ -190,9 +190,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         )
         await self.server.start_task
         if simulating:
-            self.mock_ctrl = self.make_mock_controller(
-                MTRotator.ControllerState.OFFLINE
-            )
+            self.mock_ctrl = self.make_mock_controller(ControllerState.OFFLINE)
             await self.mock_ctrl.connect_task
         await super().start()
 
@@ -377,10 +375,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         """Go from OFFLINE state, AVAILABLE offline substate to STANDBY.
         """
         self.assert_summary_state(salobj.State.OFFLINE, isbefore=True)
-        if (
-            self.server.telemetry.offline_substate
-            != MTRotator.OfflineSubstate.AVAILABLE
-        ):
+        if self.server.telemetry.offline_substate != OfflineSubstate.AVAILABLE:
             raise salobj.ExpectedError(
                 "Use the engineering interface to put the controller into state OFFLINE/AVAILABLE"
             )

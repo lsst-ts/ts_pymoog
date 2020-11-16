@@ -25,7 +25,7 @@ import pathlib
 
 from lsst.ts import salobj
 from lsst.ts import hexrotcomm
-from lsst.ts.idl.enums import MTRotator
+from lsst.ts.idl.enums.MTRotator import EnabledSubstate, ApplicationStatus
 from . import simple_mock_controller
 
 
@@ -112,7 +112,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     async def do_move(self, data):
         """Specify a position.
         """
-        self.assert_enabled_substate(MTRotator.EnabledSubstate.STATIONARY)
+        self.assert_enabled_substate(EnabledSubstate.STATIONARY)
         if (
             not self.server.config.min_position
             <= data.position
@@ -181,7 +181,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         self.evt_commandableByDDS.set_put(
             state=bool(
                 server.telemetry.application_status
-                & MTRotator.ApplicationStatus.DDS_COMMAND_SOURCE
+                & ApplicationStatus.DDS_COMMAND_SOURCE
             )
         )
 

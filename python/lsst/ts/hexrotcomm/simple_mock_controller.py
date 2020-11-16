@@ -29,7 +29,7 @@ __all__ = [
 import ctypes
 import enum
 
-from lsst.ts.idl.enums import MTRotator
+from lsst.ts.idl.enums.MTRotator import ControllerState, ApplicationStatus
 from . import constants
 from . import base_mock_controller
 
@@ -103,7 +103,7 @@ class SimpleMockController(base_mock_controller.BaseMockController):
         host=constants.LOCAL_HOST,
         command_port=constants.COMMAND_PORT,
         telemetry_port=constants.TELEMETRY_PORT,
-        initial_state=MTRotator.ControllerState.OFFLINE,
+        initial_state=ControllerState.OFFLINE,
     ):
         config = SimpleConfig()
         config.min_position = -25
@@ -124,7 +124,7 @@ class SimpleMockController(base_mock_controller.BaseMockController):
         )
 
     async def do_config_velocity(self, command):
-        self.assert_state(MTRotator.ControllerState.ENABLED)
+        self.assert_state(ControllerState.ENABLED)
         max_velocity = command.param1
         if max_velocity > 0:
             self.config.max_velocity = max_velocity
@@ -135,7 +135,7 @@ class SimpleMockController(base_mock_controller.BaseMockController):
             )
 
     async def do_position_set(self, command):
-        self.assert_state(MTRotator.ControllerState.ENABLED)
+        self.assert_state(ControllerState.ENABLED)
         position = command.param1
         if self.config.min_position <= position <= self.config.max_position:
             self.telemetry.cmd_position = position
@@ -147,9 +147,7 @@ class SimpleMockController(base_mock_controller.BaseMockController):
             )
 
     async def update_telemetry(self):
-        self.telemetry.application_status = (
-            MTRotator.ApplicationStatus.DDS_COMMAND_SOURCE
-        )
+        self.telemetry.application_status = ApplicationStatus.DDS_COMMAND_SOURCE
         self.telemetry.curr_position += 0.001
 
     async def end_run_command(self, **kwargs):

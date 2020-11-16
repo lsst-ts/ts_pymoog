@@ -26,7 +26,7 @@ import asynctest
 
 from lsst.ts import salobj
 from lsst.ts import hexrotcomm
-from lsst.ts.idl.enums import MTRotator
+from lsst.ts.idl.enums.MTRotator import ControllerState
 
 STD_TIMEOUT = 5  # timeout for command ack
 
@@ -122,7 +122,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
             await self.assert_next_summary_state(salobj.State.ENABLED)
             await self.assert_next_sample(
                 topic=self.remote.evt_controllerState,
-                controllerState=MTRotator.ControllerState.ENABLED,
+                controllerState=ControllerState.ENABLED,
             )
             data = await self.remote.tel_application.next(
                 flush=True, timeout=STD_TIMEOUT
@@ -143,7 +143,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
         async with self.make_csc(initial_state=salobj.State.ENABLED, simulation_mode=1):
             await self.assert_next_sample(
                 topic=self.remote.evt_controllerState,
-                controllerState=MTRotator.ControllerState.ENABLED,
+                controllerState=ControllerState.ENABLED,
             )
             telemetry_delay = self.csc.mock_ctrl.telemetry_interval * 3
 
