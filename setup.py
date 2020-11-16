@@ -28,7 +28,7 @@ setuptools.setup(
     package_dir={"": "python"},
     packages=setuptools.find_namespace_packages(where="python"),
     package_data={"": ["*.rst", "*.yaml"]},
-    data_files=[(os.path.join(data_files_path, "schema"), ["schema/Rotator.yaml"])],
+    data_files=[(os.path.join(data_files_path, "schema"), ["schema/MTRotator.yaml"])],
     tests_require=tests_require,
     extras_require={"dev": dev_requires},
     license="GPL",

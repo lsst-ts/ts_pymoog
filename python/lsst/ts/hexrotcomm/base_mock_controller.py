@@ -22,7 +22,7 @@ __all__ = ["BaseMockController"]
 
 import abc
 
-from lsst.ts.idl.enums import Rotator
+from lsst.ts.idl.enums import MTRotator
 from . import constants
 from . import enums
 from . import command_telemetry_client
@@ -62,7 +62,7 @@ class BaseMockController(
     telemetry_port : `int` (optional)
         Telemetry socket port. This argument is intended for unit tests;
         use the default value for normal operation.
-    initial_state : `lsst.ts.idl.enums.Rotator.ControllerState` (optional)
+    initial_state : `lsst.ts.idl.enums.MTRotator.ControllerState` (optional)
         Initial state of mock controller.
 
     Notes
@@ -90,7 +90,7 @@ class BaseMockController(
         host=constants.LOCAL_HOST,
         command_port=constants.COMMAND_PORT,
         telemetry_port=constants.TELEMETRY_PORT,
-        initial_state=Rotator.ControllerState.OFFLINE,
+        initial_state=MTRotator.ControllerState.OFFLINE,
     ):
         self.CommandCode = CommandCode
 
@@ -137,8 +137,8 @@ class BaseMockController(
 
     def assert_stationary(self):
         self.assert_state(
-            Rotator.ControllerState.ENABLED,
-            enabled_substate=Rotator.EnabledSubstate.STATIONARY,
+            MTRotator.ControllerState.ENABLED,
+            enabled_substate=MTRotator.EnabledSubstate.STATIONARY,
         )
 
     def get_command_key(self, command):
@@ -168,30 +168,30 @@ class BaseMockController(
 
     async def do_enter_control(self, command):
         self.assert_state(
-            Rotator.ControllerState.OFFLINE,
-            offline_substate=Rotator.OfflineSubstate.AVAILABLE,
+            MTRotator.ControllerState.OFFLINE,
+            offline_substate=MTRotator.OfflineSubstate.AVAILABLE,
         )
-        self.set_state(Rotator.ControllerState.STANDBY)
+        self.set_state(MTRotator.ControllerState.STANDBY)
 
     async def do_start(self, command):
-        self.assert_state(Rotator.ControllerState.STANDBY)
-        self.set_state(Rotator.ControllerState.DISABLED)
+        self.assert_state(MTRotator.ControllerState.STANDBY)
+        self.set_state(MTRotator.ControllerState.DISABLED)
 
     async def do_enable(self, command):
-        self.assert_state(Rotator.ControllerState.DISABLED)
-        self.set_state(Rotator.ControllerState.ENABLED)
+        self.assert_state(MTRotator.ControllerState.DISABLED)
+        self.set_state(MTRotator.ControllerState.ENABLED)
 
     async def do_disable(self, command):
-        self.assert_state(Rotator.ControllerState.ENABLED)
-        self.set_state(Rotator.ControllerState.DISABLED)
+        self.assert_state(MTRotator.ControllerState.ENABLED)
+        self.set_state(MTRotator.ControllerState.DISABLED)
 
     async def do_standby(self, command):
-        self.assert_state(Rotator.ControllerState.DISABLED)
-        self.set_state(Rotator.ControllerState.STANDBY)
+        self.assert_state(MTRotator.ControllerState.DISABLED)
+        self.set_state(MTRotator.ControllerState.STANDBY)
 
     async def do_exit(self, command):
-        self.assert_state(Rotator.ControllerState.STANDBY)
-        self.set_state(Rotator.ControllerState.OFFLINE)
+        self.assert_state(MTRotator.ControllerState.STANDBY)
+        self.set_state(MTRotator.ControllerState.OFFLINE)
 
     async def do_clear_error(self, command):
         # Allow initial state FAULT and STANDBY because the real controller
@@ -199,13 +199,13 @@ class BaseMockController(
         # controller the first command will (probably) transition from FAULT
         # to STANDBY, but the second must be accepted without complaint.
         if self.state not in (
-            Rotator.ControllerState.FAULT,
-            Rotator.ControllerState.STANDBY,
+            MTRotator.ControllerState.FAULT,
+            MTRotator.ControllerState.STANDBY,
         ):
             raise RuntimeError(
                 f"state={self.state!r}; must be FAULT or STANDBY for this command."
             )
-        self.set_state(Rotator.ControllerState.STANDBY)
+        self.set_state(MTRotator.ControllerState.STANDBY)
 
     async def run_command(self, command):
         self.log.debug(
@@ -248,38 +248,38 @@ class BaseMockController(
 
         Parameters
         ----------
-        state : `lsst.ts.idl.enums.Rotator.ControllerState` or `int`
+        state : `lsst.ts.idl.enums.MTRotator.ControllerState` or `int`
             New state.
 
         Notes
         -----
         Sets the substates as follows:
 
-        * `lsst.ts.idl.enums.Rotator.OfflineSubstate.AVAILABLE`
-          if state == `lsst.ts.idl.enums.Rotator.ControllerState.OFFLINE`
-        * `lsst.ts.idl.enums.Rotator.EnabledSubstate.STATIONARY`
-          if state == `lsst.ts.idl.enums.Rotator.ControllerState.ENABLED`
+        * `lsst.ts.idl.enums.MTRotator.OfflineSubstate.AVAILABLE`
+          if state == `lsst.ts.idl.enums.MTRotator.ControllerState.OFFLINE`
+        * `lsst.ts.idl.enums.MTRotator.EnabledSubstate.STATIONARY`
+          if state == `lsst.ts.idl.enums.MTRotator.ControllerState.ENABLED`
 
         The real controller goes to substate
-        `lsst.ts.idl.enums.Rotator.OfflineSubstate.PUBLISH_ONLY` when going
+        `lsst.ts.idl.enums.MTRotator.OfflineSubstate.PUBLISH_ONLY` when going
         offline, but requires the engineering user interface (EUI) to get out
         of that state, and we don't have an EUI for the mock controller!
         """
-        self.telemetry.state = Rotator.ControllerState(state)
+        self.telemetry.state = MTRotator.ControllerState(state)
         self.telemetry.offline_substate = (
-            Rotator.OfflineSubstate.AVAILABLE
-            if self.telemetry.state == Rotator.ControllerState.OFFLINE
+            MTRotator.OfflineSubstate.AVAILABLE
+            if self.telemetry.state == MTRotator.ControllerState.OFFLINE
             else 0
         )
         self.telemetry.enabled_substate = (
-            Rotator.EnabledSubstate.STATIONARY
-            if self.telemetry.state == Rotator.ControllerState.ENABLED
+            MTRotator.EnabledSubstate.STATIONARY
+            if self.telemetry.state == MTRotator.ControllerState.ENABLED
             else 0
         )
         self.log.debug(
-            f"set_state: state={Rotator.ControllerState(self.telemetry.state)!r}; "
-            f"offline_substate={Rotator.OfflineSubstate(self.telemetry.offline_substate)}; "
-            f"enabled_substate={Rotator.EnabledSubstate(self.telemetry.enabled_substate)}"
+            f"set_state: state={MTRotator.ControllerState(self.telemetry.state)!r}; "
+            f"offline_substate={MTRotator.OfflineSubstate(self.telemetry.offline_substate)}; "
+            f"enabled_substate={MTRotator.EnabledSubstate(self.telemetry.enabled_substate)}"
         )
 
     @abc.abstractmethod

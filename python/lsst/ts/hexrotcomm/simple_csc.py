@@ -25,14 +25,14 @@ import pathlib
 
 from lsst.ts import salobj
 from lsst.ts import hexrotcomm
-from lsst.ts.idl.enums import Rotator
+from lsst.ts.idl.enums import MTRotator
 from . import simple_mock_controller
 
 
 class SimpleCsc(hexrotcomm.BaseCsc):
     """Simple CSC to talk to SimpleMockController.
 
-    This is based on the Rotator CSC but only supports a small subset
+    This is based on the MTRotator CSC but only supports a small subset
     off commands, events and telemetry. See Notes for details.
     The move command sets the cmd_position and curr_position
     telemetry fields, then the controller slowly increments curr_position.
@@ -94,10 +94,10 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         self._prev_flags_tracking_lost = False
 
         schema_path = (
-            pathlib.Path(__file__).parents[4].joinpath("schema", "Rotator.yaml")
+            pathlib.Path(__file__).parents[4].joinpath("schema", "MTRotator.yaml")
         )
         super().__init__(
-            name="Rotator",
+            name="MTRotator",
             index=0,
             sync_pattern=hexrotcomm.SIMPLE_SYNC_PATTERN,
             CommandCode=simple_mock_controller.SimpleCommandCode,
@@ -112,7 +112,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     async def do_move(self, data):
         """Specify a position.
         """
-        self.assert_enabled_substate(Rotator.EnabledSubstate.STATIONARY)
+        self.assert_enabled_substate(MTRotator.EnabledSubstate.STATIONARY)
         if (
             not self.server.config.min_position
             <= data.position
@@ -181,14 +181,14 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         self.evt_commandableByDDS.set_put(
             state=bool(
                 server.telemetry.application_status
-                & Rotator.ApplicationStatus.DDS_COMMAND_SOURCE
+                & MTRotator.ApplicationStatus.DDS_COMMAND_SOURCE
             )
         )
 
-        self.tel_Application.set_put(
-            Demand=server.telemetry.cmd_position,
-            Position=server.telemetry.curr_position,
-            Error=server.telemetry.curr_position - server.telemetry.cmd_position,
+        self.tel_application.set_put(
+            demand=server.telemetry.cmd_position,
+            position=server.telemetry.curr_position,
+            error=server.telemetry.curr_position - server.telemetry.cmd_position,
         )
 
     def make_mock_controller(self, initial_ctrl_state):

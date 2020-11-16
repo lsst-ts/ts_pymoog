@@ -25,7 +25,7 @@ import abc
 import asyncio
 
 from lsst.ts import salobj
-from lsst.ts.idl.enums import Rotator
+from lsst.ts.idl.enums import MTRotator
 from . import enums
 from . import constants
 from . import structs
@@ -34,13 +34,13 @@ from . import command_telemetry_server
 
 # Dict of controller state: CSC state.
 # The names match but the numeric values do not.
-# Note that Rotator and Hexapod values match, so I just picked one.
+# Note that MTRotator and MTHexapod values match, so I just picked one.
 ControllerStateCscState = {
-    Rotator.ControllerState.OFFLINE: salobj.State.OFFLINE,
-    Rotator.ControllerState.STANDBY: salobj.State.STANDBY,
-    Rotator.ControllerState.DISABLED: salobj.State.DISABLED,
-    Rotator.ControllerState.ENABLED: salobj.State.ENABLED,
-    Rotator.ControllerState.FAULT: salobj.State.FAULT,
+    MTRotator.ControllerState.OFFLINE: salobj.State.OFFLINE,
+    MTRotator.ControllerState.STANDBY: salobj.State.STANDBY,
+    MTRotator.ControllerState.DISABLED: salobj.State.DISABLED,
+    MTRotator.ControllerState.ENABLED: salobj.State.ENABLED,
+    MTRotator.ControllerState.FAULT: salobj.State.FAULT,
 }
 
 # Dict of CSC state: controller state.
@@ -190,7 +190,9 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         )
         await self.server.start_task
         if simulating:
-            self.mock_ctrl = self.make_mock_controller(Rotator.ControllerState.OFFLINE)
+            self.mock_ctrl = self.make_mock_controller(
+                MTRotator.ControllerState.OFFLINE
+            )
             await self.mock_ctrl.connect_task
         await super().start()
 
@@ -375,7 +377,10 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         """Go from OFFLINE state, AVAILABLE offline substate to STANDBY.
         """
         self.assert_summary_state(salobj.State.OFFLINE, isbefore=True)
-        if self.server.telemetry.offline_substate != Rotator.OfflineSubstate.AVAILABLE:
+        if (
+            self.server.telemetry.offline_substate
+            != MTRotator.OfflineSubstate.AVAILABLE
+        ):
             raise salobj.ExpectedError(
                 "Use the engineering interface to put the controller into state OFFLINE/AVAILABLE"
             )
