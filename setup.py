@@ -17,8 +17,8 @@ data_files_path = tools_path.relative_to(base_prefix).parents[1]
 
 setuptools.setup(
     name="ts_hexrotcomm",
-    description="Python code for communicating with and emulating the low-level main telescope "
-    "camera and hexapod controllers written by Moog",
+    description="Python code for communicating with and emulating the low-level "
+    "main telescope hexapod and rotator controllers written by Moog",
     use_scm_version={
         "write_to": "python/lsst/ts/hexrotcomm/version.py",
         "write_to_template": scm_version_template,
@@ -28,7 +28,7 @@ setuptools.setup(
     package_dir={"": "python"},
     packages=setuptools.find_namespace_packages(where="python"),
     package_data={"": ["*.rst", "*.yaml"]},
-    data_files=[(os.path.join(data_files_path, "schema"), ["schema/Rotator.yaml"])],
+    data_files=[(os.path.join(data_files_path, "schema"), ["schema/MTRotator.yaml"])],
     tests_require=tests_require,
     extras_require={"dev": dev_requires},
     license="GPL",
