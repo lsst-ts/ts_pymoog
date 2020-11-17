@@ -33,7 +33,7 @@ STD_TIMEOUT = 5  # timeout for command ack
 LOCAL_CONFIG_DIR = pathlib.Path(__file__).parent / "data" / "config"
 
 
-class TestSimpleCsc(salobj.BaseCscTestCase, asynctest.TestCase):
+class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
     def basic_make_csc(
         self, config_dir=None, initial_state=salobj.State.OFFLINE, simulation_mode=1
     ):
@@ -46,16 +46,13 @@ class TestSimpleCsc(salobj.BaseCscTestCase, asynctest.TestCase):
     async def test_constructor_errors(self):
         for bad_initial_state in (0, max(salobj.State) + 1):
             with self.assertRaises(ValueError):
-                hexrotcomm.SimpleCsc(
-                    initial_state=bad_initial_state, simulation_mode=1, config_dir=None,
-                )
+                hexrotcomm.SimpleCsc(initial_state=bad_initial_state, simulation_mode=1)
 
         for bad_simulation_mode in (-1, 2):
             with self.assertRaises(ValueError):
                 hexrotcomm.SimpleCsc(
                     initial_state=bad_initial_state,
                     simulation_mode=bad_simulation_mode,
-                    config_dir=None,
                 )
 
         with self.assertRaises(ValueError):
@@ -64,6 +61,14 @@ class TestSimpleCsc(salobj.BaseCscTestCase, asynctest.TestCase):
                 simulation_mode=1,
                 config_dir="no_such_directory",
             )
+
+        for bad_initial_state in salobj.State:
+            if bad_initial_state == salobj.State.OFFLINE:
+                continue
+            with self.assertRaises(ValueError):
+                hexrotcomm.SimpleCsc(
+                    initial_state=bad_initial_state, simulation_mode=0,
+                )
 
     async def test_invalid_config(self):
         async with self.make_csc(
@@ -114,6 +119,7 @@ class TestSimpleCsc(salobj.BaseCscTestCase, asynctest.TestCase):
         """
         destination = 2  # a small move so the test runs quickly
         async with self.make_csc(initial_state=salobj.State.ENABLED, simulation_mode=1):
+            await self.assert_next_summary_state(salobj.State.ENABLED)
             await self.assert_next_sample(
                 topic=self.remote.evt_controllerState,
                 controllerState=Rotator.ControllerState.ENABLED,

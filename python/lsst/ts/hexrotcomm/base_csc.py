@@ -35,7 +35,7 @@ from . import command_telemetry_server
 # Dict of controller state: CSC state.
 # The names match but the numeric values do not.
 # Note that Rotator and Hexapod values match, so I just picked one.
-StateCscState = {
+ControllerStateCscState = {
     Rotator.ControllerState.OFFLINE: salobj.State.OFFLINE,
     Rotator.ControllerState.STANDBY: salobj.State.STANDBY,
     Rotator.ControllerState.DISABLED: salobj.State.DISABLED,
@@ -45,7 +45,9 @@ StateCscState = {
 
 # Dict of CSC state: controller state.
 # The names match but the numeric values do not.
-CscStateState = dict((value, key) for key, value in StateCscState.items())
+CscStateControllerState = dict(
+    (value, key) for key, value in ControllerStateCscState.items()
+)
 
 
 class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
@@ -80,16 +82,19 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         configuration directory (obtained from `_get_default_config_dir`).
         This is provided for unit testing.
     initial_state : `lsst.ts.salobj.State` or `int` (optional)
-        The initial state of the CSC. Ignored (other than checking
-        that it is a valid value) except in simulation mode,
-        because in normal operation the initial state OFFLINE,
-        followed by the current state of the controller (if different).
-        This is provided for unit testing.
+        The initial state of the CSC.
+        Must be `lsst.ts.salobj.State.OFFLINE` if ``simulation_mode = 0``.
     simulation_mode : `int` (optional)
         Simulation mode. Allowed values:
 
         * 0: regular operation.
         * 1: simulation: use a mock low level controller.
+
+    Raises
+    ------
+    ValueError
+        If ``initial_state != lsst.ts.salobj.State.OFFLINE``
+        and not simulating (``simulation_mode = 0``).
 
     Notes
     -----
@@ -109,6 +114,8 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
       except `begin_start`.
     """
 
+    default_initial_state = salobj.State.OFFLINE
+
     def __init__(
         self,
         *,
@@ -123,15 +130,13 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         initial_state=salobj.State.OFFLINE,
         simulation_mode=0,
     ):
-        # Check the value of initial_state, then ignore it if not simulating
-        initial_state = salobj.State(initial_state)
         if simulation_mode not in (0, 1):
             raise ValueError(f"simulation_mode = {simulation_mode}; must be 0 or 1")
-        if simulation_mode == 0:
-            # Normal mode: start in initial state OFFLINE,
-            # then when connected to the low-level controller,
-            # report the state of the low-level controller.
-            initial_state = salobj.State.OFFLINE
+        if initial_state != salobj.State.OFFLINE and simulation_mode != 1:
+            raise ValueError(
+                f"initial_state = {initial_state!r} "
+                f"must be {salobj.State.OFFLINE!r} if not simulating"
+            )
         self.server = None
         self.CommandCode = CommandCode
         self.ConfigClass = ConfigClass
@@ -161,7 +166,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         or OFFLINE if unknown.
         """
         if self.server is not None and self.server.connected:
-            return StateCscState.get(
+            return ControllerStateCscState.get(
                 int(self.server.telemetry.state), salobj.State.OFFLINE
             )
         elif not self.start_task.done():
@@ -171,7 +176,6 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         return salobj.State.OFFLINE
 
     async def start(self):
-        await super().start()
         simulating = self.simulation_mode != 0
         host = constants.LOCAL_HOST if simulating else None
         self.server = command_telemetry_server.CommandTelemetryServer(
@@ -186,9 +190,9 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         )
         await self.server.start_task
         if simulating:
-            initial_ctrl_state = CscStateState[self.summary_state]
-            self.mock_ctrl = self.make_mock_controller(initial_ctrl_state)
+            self.mock_ctrl = self.make_mock_controller(Rotator.ControllerState.OFFLINE)
             await self.mock_ctrl.connect_task
+        await super().start()
 
     async def close_tasks(self):
         await super().close_tasks()
@@ -228,6 +232,8 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         """Assert that the controller is connected and has CSC commands
         enabled.
         """
+        if self.server is None:
+            raise salobj.ExpectedError("No server")
         if not self.server.connected:
             raise salobj.ExpectedError("Controller is not connected")
         if not self.evt_commandableByDDS.data.state:
