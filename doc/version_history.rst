@@ -6,6 +6,20 @@
 Version History
 ###############
 
+v0.11.0
+=======
+
+* Update for ts_xml 7 and ts_idl 2.2:
+
+    * Rename SAL component and ts_idl enum module ``Rotator`` to ``MTRotator``.
+
+Requires:
+
+* ts_salobj 6.1
+* ts_idl 2.2
+* ts_xml 7
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for SimpleCsc and unit tests)
+
 v0.10.0
 =======
 

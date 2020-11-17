@@ -22,7 +22,12 @@ __all__ = ["BaseCscTestCase"]
 
 import contextlib
 
-from lsst.ts.idl.enums import Rotator
+from lsst.ts.idl.enums.MTRotator import (
+    ControllerState,
+    OfflineSubstate,
+    EnabledSubstate,
+    ApplicationStatus,
+)
 from lsst.ts import salobj
 from .base_csc import CscStateControllerState
 
@@ -38,10 +43,10 @@ class BaseCscTestCase(salobj.BaseCscTestCase):
     controller state in make_csc.
     """
 
-    ControllerState = Rotator.ControllerState
-    OfflineSubstate = Rotator.OfflineSubstate
-    EnabledSubstate = Rotator.EnabledSubstate
-    ApplicationStatus = Rotator.ApplicationStatus
+    ControllerState = ControllerState
+    OfflineSubstate = OfflineSubstate
+    EnabledSubstate = EnabledSubstate
+    ApplicationStatus = ApplicationStatus
 
     @contextlib.asynccontextmanager
     async def make_csc(
@@ -120,7 +125,7 @@ class BaseCscTestCase(salobj.BaseCscTestCase):
         Parameters
         ----------
         name : `str`
-            Name of SAL component, e.g. "Rotator"
+            Name of SAL component, e.g. "MTRotator"
         index : `int` or `None`
             SAL index of component.
         exe_name : `str`

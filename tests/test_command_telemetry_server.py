@@ -25,7 +25,7 @@ import unittest
 
 import asynctest
 
-from lsst.ts.idl.enums import Rotator
+from lsst.ts.idl.enums.MTRotator import ControllerState
 from lsst.ts import hexrotcomm
 
 # Standard timeout for TCP/IP messages (sec).
@@ -96,7 +96,7 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
             log=self.server.log,
             command_port=self.server.command_port,
             telemetry_port=self.server.telemetry_port,
-            initial_state=Rotator.ControllerState.ENABLED,
+            initial_state=ControllerState.ENABLED,
         )
         await self.mock_ctrl.connect_task
         await self.server.wait_connected()
