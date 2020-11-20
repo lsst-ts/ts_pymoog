@@ -26,6 +26,7 @@ import math
 
 import astropy.time
 
+from lsst.ts import salobj
 from . import constants
 from . import structs
 from . import utils
@@ -264,8 +265,8 @@ class CommandTelemetryClient:
         try:
             await self.write_config()
             while self.telemetry_connected:
-                header = self.update_and_get_header(self.telemetry.FRAME_ID)
-                await self.update_telemetry()
+                header, curr_tai = self.update_and_get_header(self.telemetry.FRAME_ID)
+                await self.update_telemetry(curr_tai=curr_tai)
                 await utils.write_from(self.telemetry_writer, header, self.telemetry)
                 await asyncio.sleep(self.telemetry_interval)
             self.log.warning("Telemetry socket disconnected; reconnecting")
@@ -280,11 +281,11 @@ class CommandTelemetryClient:
         """Write the current configuration.
         """
         assert self.telemetry_writer is not None
-        header = self.update_and_get_header(self.config.FRAME_ID)
+        header, curr_tai = self.update_and_get_header(self.config.FRAME_ID)
         await utils.write_from(self.telemetry_writer, header, self.config)
 
     def update_and_get_header(self, frame_id):
-        """Update the config or telemetry header and return it.
+        """Update the config or telemetry header and return it and the time.
 
         Call this prior to writing telemetry or configuration.
 
@@ -292,16 +293,24 @@ class CommandTelemetryClient:
         ----------
         frame_id : `int`
             Frame ID of header to write.
+
+        Returns
+        -------
+        header : `structs.Header`
+            The header.
+        curr_tai : `float`
+            Current time in header timestamp (TAI, unix seconds).
         """
         header = self.headers[frame_id]
         curr_time = astropy.time.Time.now()
+        curr_tai = salobj.tai_from_utc(curr_time)
         mjd_frac, mjd_days = math.modf(curr_time.utc.mjd)
         header.mjd = int(mjd_days)
         header.mjd_frac = mjd_frac
         unix_frac, unix_sec = math.modf(curr_time.utc.unix)
         header.tv_sec = int(unix_sec)
         header.tv_nsec = int(unix_frac * 1e9)
-        return header
+        return header, curr_tai
 
     @abc.abstractmethod
     async def run_command(self, command):

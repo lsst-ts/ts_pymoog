@@ -6,6 +6,22 @@
 Version History
 ###############
 
+v0.12.0
+=======
+
+* Update the mock controller to make the time used in update_telemetry match the time in the header:
+
+    * Update `CommandTelemetryClient.update_and_get_header` to return the current time in addition to the header,
+      and update the call to `update_telemetry` to provide that time.
+    * Update `BaseMockController,update_telemetry` and `SimpleMockController.update_telemetry` to receive time as an argument.
+
+Requires:
+
+* ts_salobj 6.1
+* ts_idl 2.2
+* ts_xml 7
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for SimpleCsc and unit tests)
+
 v0.11.0
 =======
 
