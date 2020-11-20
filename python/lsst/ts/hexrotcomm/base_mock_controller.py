@@ -282,7 +282,14 @@ class BaseMockController(
         )
 
     @abc.abstractmethod
-    async def update_telemetry(self):
+    async def update_telemetry(self, curr_tai):
         """Update self.client.telemetry.
+
+        Parameters
+        ----------
+        curr_tai : `float`
+            Time at which to compute telemetry (TAI, unix seconds).
+            This is the time in the header, which is (approximately)
+            the current time.
         """
         raise NotImplementedError()

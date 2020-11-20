@@ -146,7 +146,7 @@ class SimpleMockController(base_mock_controller.BaseMockController):
                 f"[{self.config.min_position}, {self.config.max_position}]; ignoring the command."
             )
 
-    async def update_telemetry(self):
+    async def update_telemetry(self, curr_tai):
         self.telemetry.application_status = ApplicationStatus.DDS_COMMAND_SOURCE
         self.telemetry.curr_position += 0.001
 
