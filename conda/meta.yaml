@@ -20,8 +20,8 @@ build:
 test:
   requires:
     - ts-conda-build
-    - ts-idl
-    - ts-salobj
+    - ts-idl {{ idl_version }}
+    - ts-salobj {{ salobj_version }}
   source_files:
     - python
     - tests
