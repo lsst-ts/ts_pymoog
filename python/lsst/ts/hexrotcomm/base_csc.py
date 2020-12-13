@@ -84,6 +84,9 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
     initial_state : `lsst.ts.salobj.State` or `int` (optional)
         The initial state of the CSC.
         Must be `lsst.ts.salobj.State.OFFLINE` if ``simulation_mode = 0``.
+    settings_to_apply : `str`, optional
+        Settings to apply if ``initial_state`` is `State.DISABLED`
+        or `State.ENABLED`.
     simulation_mode : `int` (optional)
         Simulation mode. Allowed values:
 
@@ -128,6 +131,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         schema_path,
         config_dir=None,
         initial_state=salobj.State.OFFLINE,
+        settings_to_apply="",
         simulation_mode=0,
     ):
         if simulation_mode not in (0, 1):
@@ -150,6 +154,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
             schema_path=schema_path,
             config_dir=config_dir,
             initial_state=initial_state,
+            settings_to_apply=settings_to_apply,
             simulation_mode=simulation_mode,
         )
         # start needs to know the simulation mode before
