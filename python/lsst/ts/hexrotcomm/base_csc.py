@@ -247,6 +247,17 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
                 "use the EUI to enable CSC commands"
             )
 
+    def assert_enabled_substate(self, substate):
+        """Assert the controller is enabled and in the specified substate.
+        """
+        self.assert_summary_state(salobj.State.ENABLED, isbefore=True)
+        if self.server.telemetry.enabled_substate != substate:
+            raise salobj.ExpectedError(
+                "Low-level controller in substate "
+                f"{self.server.telemetry.enabled_substate} "
+                f"instead of {substate!r}"
+            )
+
     def assert_summary_state(self, *allowed_states, isbefore):
         """Assert that the current summary state is as specified.
 
@@ -433,17 +444,6 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         )
         await self.server.next_telemetry()
         self.assert_summary_state(salobj.State.DISABLED, isbefore=False)
-
-    def assert_enabled_substate(self, substate):
-        """Assert the controller is enabled and in the specified substate.
-        """
-        self.assert_summary_state(salobj.State.ENABLED, isbefore=True)
-        if self.server.telemetry.enabled_substate != substate:
-            raise salobj.ExpectedError(
-                "Low-level controller in substate "
-                f"{self.server.telemetry.enabled_substate} "
-                f"instead of {substate!r}"
-            )
 
     def connect_callback(self, server):
         """Called when the server's command or telemetry sockets
