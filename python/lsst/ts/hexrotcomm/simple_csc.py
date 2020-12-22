@@ -48,6 +48,9 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         that it is a valid value) except in simulation mode,
         because in normal operation the initial state is the current state
         of the controller. This is provided for unit testing.
+    settings_to_apply : `str`, optional
+        Settings to apply if ``initial_state`` is `State.DISABLED`
+        or `State.ENABLED`.
     simulation_mode : `int` (optional)
         Simulation mode. Allowed values:
 
@@ -80,7 +83,11 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     valid_simulation_modes = [0, 1]
 
     def __init__(
-        self, config_dir=None, initial_state=salobj.State.OFFLINE, simulation_mode=0
+        self,
+        config_dir=None,
+        initial_state=salobj.State.OFFLINE,
+        simulation_mode=0,
+        settings_to_apply="",
     ):
         self.server = None
         self.mock_ctrl = None
@@ -106,6 +113,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
             schema_path=schema_path,
             config_dir=config_dir,
             initial_state=initial_state,
+            settings_to_apply=settings_to_apply,
             simulation_mode=simulation_mode,
         )
 

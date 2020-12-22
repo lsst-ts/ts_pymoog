@@ -84,6 +84,9 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
     initial_state : `lsst.ts.salobj.State` or `int` (optional)
         The initial state of the CSC.
         Must be `lsst.ts.salobj.State.OFFLINE` if ``simulation_mode = 0``.
+    settings_to_apply : `str`, optional
+        Settings to apply if ``initial_state`` is `State.DISABLED`
+        or `State.ENABLED`.
     simulation_mode : `int` (optional)
         Simulation mode. Allowed values:
 
@@ -128,6 +131,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         schema_path,
         config_dir=None,
         initial_state=salobj.State.OFFLINE,
+        settings_to_apply="",
         simulation_mode=0,
     ):
         if simulation_mode not in (0, 1):
@@ -150,6 +154,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
             schema_path=schema_path,
             config_dir=config_dir,
             initial_state=initial_state,
+            settings_to_apply=settings_to_apply,
             simulation_mode=simulation_mode,
         )
         # start needs to know the simulation mode before
@@ -242,12 +247,39 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
                 "use the EUI to enable CSC commands"
             )
 
+    def assert_enabled_substate(self, substate):
+        """Assert the controller is enabled and in the specified substate.
+
+        Parameters
+        ----------
+        substate : `lsst.ts.idl.enums.MTHexapod.EnabledSubstate`
+            Substate of low-level controller.
+        """
+        self.assert_summary_state(salobj.State.ENABLED, isbefore=True)
+        if self.server.telemetry.enabled_substate != substate:
+            raise salobj.ExpectedError(
+                "Low-level controller in substate "
+                f"{self.server.telemetry.enabled_substate} "
+                f"instead of {substate!r}"
+            )
+
     def assert_summary_state(self, *allowed_states, isbefore):
         """Assert that the current summary state is as specified.
 
         Also checks that the controller is commandable.
 
         Used in do_xxx methods to check that a command is allowed.
+
+        Parameters
+        ----------
+        allowed_states : `List` [`lsst.ts.salobj.State`]
+            Allowed summary states.
+        isbefore : `bool`
+            Determines the error message prefix.
+            Set True if checking initial conditions before commanding
+            the low-level controller. Message is "Rejected: initial state ...".
+            Set False if checking the state after commanding
+            the low-level controller. Message is "Failed: final state ..."
         """
         self.assert_commandable()
         if self.summary_state not in allowed_states:
@@ -271,7 +303,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         ----------
         code : ``CommandCode``
             Command to run.
-        param1, param2, param3, param4, param5, param6: `double`
+        param1, param2, param3, param4, param5, param6 : `double`
             Command parameters. The meaning of these parameters
             depends on the command code.
 
@@ -301,7 +333,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         ----------
         code : ``CommandCode``
             Command to run.
-        param1, param2, param3, param4, param5, param6: `double`
+        param1, param2, param3, param4, param5, param6 : `double`
             Command parameters. The meaning of these parameters
             depends on the command code.
         """
@@ -428,17 +460,6 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         )
         await self.server.next_telemetry()
         self.assert_summary_state(salobj.State.DISABLED, isbefore=False)
-
-    def assert_enabled_substate(self, substate):
-        """Assert the controller is enabled and in the specified substate.
-        """
-        self.assert_summary_state(salobj.State.ENABLED, isbefore=True)
-        if self.server.telemetry.enabled_substate != substate:
-            raise salobj.ExpectedError(
-                "Low-level controller in substate "
-                f"{self.server.telemetry.enabled_substate} "
-                f"instead of {substate!r}"
-            )
 
     def connect_callback(self, server):
         """Called when the server's command or telemetry sockets

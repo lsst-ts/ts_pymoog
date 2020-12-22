@@ -6,11 +6,31 @@
 Version History
 ###############
 
+v0.13.0
+=======
+
+* Add optional ``set_simulation_mode`` constructor argument to `BaseCsc` and `SimpleCsc`.
+  This is a backwards compatible change.
+
+Requires:
+
+* ts_salobj 6.1
+* ts_idl 2.2
+* ts_xml 7
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for SimpleCsc and unit tests)
+
 v0.12.1
 =======
 
 * Update Jenkinsfile.conda to use Jenkins Shared Library
 * Pinned the ts-idl and ts-salobj version in conda recipe
+
+Requires:
+
+* ts_salobj 6.1
+* ts_idl 2.2
+* ts_xml 7
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for SimpleCsc and unit tests)
 
 v0.12.0
 =======
