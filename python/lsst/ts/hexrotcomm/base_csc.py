@@ -249,6 +249,11 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
 
     def assert_enabled_substate(self, substate):
         """Assert the controller is enabled and in the specified substate.
+
+        Parameters
+        ----------
+        substate : `lsst.ts.idl.enums.MTHexapod.EnabledSubstate`
+            Substate of low-level controller.
         """
         self.assert_summary_state(salobj.State.ENABLED, isbefore=True)
         if self.server.telemetry.enabled_substate != substate:
@@ -264,6 +269,17 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         Also checks that the controller is commandable.
 
         Used in do_xxx methods to check that a command is allowed.
+
+        Parameters
+        ----------
+        allowed_states : `List` [`lsst.ts.salobj.State`]
+            Allowed summary states.
+        isbefore : `bool`
+            Determines the error message prefix.
+            Set True if checking initial conditions before commanding
+            the low-level controller. Message is "Rejected: initial state ...".
+            Set False if checking the state after commanding
+            the low-level controller. Message is "Failed: final state ..."
         """
         self.assert_commandable()
         if self.summary_state not in allowed_states:
@@ -287,7 +303,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         ----------
         code : ``CommandCode``
             Command to run.
-        param1, param2, param3, param4, param5, param6: `double`
+        param1, param2, param3, param4, param5, param6 : `double`
             Command parameters. The meaning of these parameters
             depends on the command code.
 
@@ -317,7 +333,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         ----------
         code : ``CommandCode``
             Command to run.
-        param1, param2, param3, param4, param5, param6: `double`
+        param1, param2, param3, param4, param5, param6 : `double`
             Command parameters. The meaning of these parameters
             depends on the command code.
         """
