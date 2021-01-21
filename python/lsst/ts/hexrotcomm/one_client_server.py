@@ -36,8 +36,9 @@ class OneClientServer:
     ----------
     name : `str`
         Name used for error messages. Typically "Commands" or "Telemetry".
-    host : `str`
+    host : `str` or `None`
         IP address for this server.
+        If `None` then bind to all network interfaces.
     port : `int`
         IP port for this server. If 0 then use a random port.
     log : `logging.Logger`

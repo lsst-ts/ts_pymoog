@@ -20,6 +20,7 @@
 
 __all__ = [
     "SIMPLE_SYNC_PATTERN",
+    "SIMPLE_TELEMETRY_PORT",
     "SimpleCommandCode",
     "SimpleConfig",
     "SimpleTelemetry",
@@ -35,6 +36,11 @@ from . import base_mock_controller
 
 
 SIMPLE_SYNC_PATTERN = 0x1234
+
+# Telemetry/configuration port. The command port is one larger.
+# This is an arbitrary value chosen to be well away from the telemetry ports
+# for the MT camera rotator and two MT hexapods.
+SIMPLE_TELEMETRY_PORT = 6210
 
 
 class SimpleCommandCode(enum.IntEnum):
@@ -101,8 +107,8 @@ class SimpleMockController(base_mock_controller.BaseMockController):
         self,
         log,
         host=constants.LOCAL_HOST,
-        command_port=constants.COMMAND_PORT,
-        telemetry_port=constants.TELEMETRY_PORT,
+        command_port=SIMPLE_TELEMETRY_PORT + 1,
+        telemetry_port=SIMPLE_TELEMETRY_PORT,
         initial_state=ControllerState.OFFLINE,
     ):
         config = SimpleConfig()

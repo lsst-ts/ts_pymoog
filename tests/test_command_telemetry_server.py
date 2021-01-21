@@ -64,13 +64,13 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         log.setLevel(logging.INFO)
         self.server = hexrotcomm.CommandTelemetryServer(
             host=hexrotcomm.LOCAL_HOST,
+            port=0,
             log=log,
             ConfigClass=hexrotcomm.SimpleConfig,
             TelemetryClass=hexrotcomm.SimpleTelemetry,
             connect_callback=self.connect_callback,
             config_callback=self.config_callback,
             telemetry_callback=self.telemetry_callback,
-            use_random_ports=True,
         )
         await self.server.start_task
         # Mock controller; None until make_controller is called

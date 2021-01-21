@@ -58,14 +58,12 @@ class BaseMockController(
         Configuration data. May be modified.
     telemetry : `ctypes.Structure`
         Telemetry data. Modified by `update_telemetry`.
+    command_port : `int`
+        Command socket port.
+    telemetry_port : `int`
+        Telemetry socket port.
     host : `str` (optional)
         IP address of CSC server.
-    command_port : `int` (optional)
-        Command socket port.  This argument is intended for unit tests;
-        use the default value for normal operation.
-    telemetry_port : `int` (optional)
-        Telemetry socket port. This argument is intended for unit tests;
-        use the default value for normal operation.
     initial_state : `lsst.ts.idl.enums.ControllerState` (optional)
         Initial state of mock controller.
 
@@ -91,9 +89,9 @@ class BaseMockController(
         extra_commands,
         config,
         telemetry,
+        command_port,
+        telemetry_port,
         host=constants.LOCAL_HOST,
-        command_port=constants.COMMAND_PORT,
-        telemetry_port=constants.TELEMETRY_PORT,
         initial_state=ControllerState.OFFLINE,
     ):
         self.CommandCode = CommandCode
@@ -120,9 +118,9 @@ class BaseMockController(
             log=log,
             config=config,
             telemetry=telemetry,
-            host=host,
             command_port=command_port,
             telemetry_port=telemetry_port,
+            host=host,
         )
 
         self.set_state(initial_state)

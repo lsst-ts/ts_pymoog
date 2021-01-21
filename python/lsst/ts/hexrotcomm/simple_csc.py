@@ -103,9 +103,13 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         schema_path = (
             pathlib.Path(__file__).parents[4].joinpath("schema", "MTRotator.yaml")
         )
+        port = (
+            simple_mock_controller.SIMPLE_TELEMETRY_PORT if simulation_mode == 0 else 0
+        )
         super().__init__(
             name="MTRotator",
             index=0,
+            port=port,
             sync_pattern=hexrotcomm.SIMPLE_SYNC_PATTERN,
             CommandCode=simple_mock_controller.SimpleCommandCode,
             ConfigClass=simple_mock_controller.SimpleConfig,
