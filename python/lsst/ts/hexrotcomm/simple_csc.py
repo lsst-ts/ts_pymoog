@@ -1,6 +1,6 @@
 # This file is part of ts_hexapod.
 #
-# Developed for the LSST Data Management System.
+# Developed for the Rubin Observatory Telescope and Site System.
 # This product includes software developed by the LSST Project
 # (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
@@ -103,9 +103,13 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         schema_path = (
             pathlib.Path(__file__).parents[4].joinpath("schema", "MTRotator.yaml")
         )
+        port = (
+            simple_mock_controller.SIMPLE_TELEMETRY_PORT if simulation_mode == 0 else 0
+        )
         super().__init__(
             name="MTRotator",
             index=0,
+            port=port,
             sync_pattern=hexrotcomm.SIMPLE_SYNC_PATTERN,
             CommandCode=simple_mock_controller.SimpleCommandCode,
             ConfigClass=simple_mock_controller.SimpleConfig,

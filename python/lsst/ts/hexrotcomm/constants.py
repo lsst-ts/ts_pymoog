@@ -1,6 +1,6 @@
 # This file is part of ts_hexrotcomm.
 #
-# Developed for the LSST Data Management System.
+# Developed for the Rubin Observatory Telescope and Site System.
 # This product includes software developed by the LSST Project
 # (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
@@ -19,9 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["COMMAND_PORT", "TELEMETRY_PORT", "LOCAL_HOST"]
+__all__ = ["LOCAL_HOST"]
 
-COMMAND_PORT = 5571
-TELEMETRY_PORT = 5570
 
 LOCAL_HOST = "127.0.0.1"

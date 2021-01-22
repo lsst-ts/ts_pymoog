@@ -1,6 +1,6 @@
 # This file is part of ts_hexrotcomm.
 #
-# Developed for the LSST Data Management System.
+# Developed for the Rubin Observatory Telescope and Site System.
 # This product includes software developed by the LSST Project
 # (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
@@ -36,8 +36,9 @@ class OneClientServer:
     ----------
     name : `str`
         Name used for error messages. Typically "Commands" or "Telemetry".
-    host : `str`
+    host : `str` or `None`
         IP address for this server.
+        If `None` then bind to all network interfaces.
     port : `int`
         IP port for this server. If 0 then use a random port.
     log : `logging.Logger`

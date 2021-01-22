@@ -6,6 +6,22 @@
 Version History
 ###############
 
+v0.14.0
+=======
+
+* Support different ports for different CSCs:
+
+    * Eliminate COMMAND_PORT and TELEMETRY_PORT constants.
+    * `CommandTelemetryServer`: replace use_random_port argument with port.
+    * `CommandTelemetryClient` and `BaseMockController`: make the command_port and telemetry_port arguments required.
+
+Requires:
+
+* ts_salobj 6.1
+* ts_idl 2.2
+* ts_xml 7
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for SimpleCsc and unit tests)
+
 v0.13.0
 =======
 
