@@ -1,6 +1,6 @@
 # This file is part of ts_hexapod.
 #
-# Developed for the LSST Data Management System.
+# Developed for the Rubin Observatory Telescope and Site System.
 # This product includes software developed by the LSST Project
 # (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
@@ -60,6 +60,12 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
     index : `int` or `None` (optional)
         SAL component index, or 0 or None if the component is not indexed.
         A value is required if the component is indexed.
+    port : `int`
+        Port for telemetry and configuration;
+        if nonzero then the command port will be one larger.
+        Specify 0 to choose random values for both ports;
+        this is recommended for unit tests, to avoid collision
+        with a running CSC.
     sync_pattern : `int`
         Sync pattern sent with commands.
     CommandCode : `enum`
@@ -124,6 +130,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         *,
         name,
         index,
+        port,
         sync_pattern,
         CommandCode,
         ConfigClass,
@@ -141,6 +148,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
                 f"initial_state = {initial_state!r} "
                 f"must be {salobj.State.OFFLINE!r} if not simulating"
             )
+        self.port = port
         self.server = None
         self.CommandCode = CommandCode
         self.ConfigClass = ConfigClass
@@ -185,13 +193,13 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         host = constants.LOCAL_HOST if simulating else None
         self.server = command_telemetry_server.CommandTelemetryServer(
             host=host,
+            port=self.port,
             log=self.log,
             ConfigClass=self.ConfigClass,
             TelemetryClass=self.TelemetryClass,
             connect_callback=self.connect_callback,
             config_callback=self.config_callback,
             telemetry_callback=self.telemetry_callback,
-            use_random_ports=simulating,
         )
         await self.server.start_task
         if simulating:

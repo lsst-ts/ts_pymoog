@@ -1,6 +1,6 @@
 # This file is part of ts_hexrotcomm.
 #
-# Developed for the LSST Data Management System.
+# Developed for the Rubin Observatory Telescope and Site System.
 # This product includes software developed by the LSST Project
 # (https://www.lsst.org).
 # See the COPYRIGHT file at the top-level directory of this distribution
@@ -23,7 +23,6 @@ __all__ = ["CommandTelemetryServer"]
 
 import asyncio
 
-from . import constants
 from . import structs
 from . import utils
 from . import one_client_server
@@ -35,8 +34,15 @@ class CommandTelemetryServer:
 
     Parameters
     ----------
-    host : `str`
+    host : `str` or `None`
         IP address for this server.
+        If `None` then bind to all network interfaces.
+    port : `int`
+        Port for telemetry and configuration;
+        if nonzero then the command port will be one larger.
+        Specify 0 to choose random values for both ports;
+        this is recommended for unit tests, to avoid collision
+        with a running CSC.
     log : `logging.Logger`
         Logger.
     ConfigClass : `ctypes.Structure`
@@ -52,10 +58,6 @@ class CommandTelemetryServer:
     telemetry_callback : callable
         Function to call when telemetry is read.
         The function receives one argument: this server.
-    use_random_ports : `bool` (optional)
-        If True then use random free ports for command and telemetry,
-        else use the standard ports. Use True for unit tests
-        to allow running multiple tests in parallel.
     """
 
     connect_timeout = 10
@@ -68,14 +70,15 @@ class CommandTelemetryServer:
         self,
         host,
         log,
+        port,
         ConfigClass,
         TelemetryClass,
         connect_callback,
         config_callback,
         telemetry_callback,
-        use_random_ports=False,
     ):
         self.host = host
+        self.port = port
         self.log = log.getChild("CommandTelemetryServer")
         self.header = structs.Header()
         self.config = ConfigClass()
@@ -83,7 +86,6 @@ class CommandTelemetryServer:
         self.connect_callback = connect_callback
         self.config_callback = config_callback
         self.telemetry_callback = telemetry_callback
-        self.use_random_ports = use_random_ports
         # Dict of command_code: number of times this command has been sent;
         # note that the count will wrap around at some point determined
         # by the data type of Command.counter.
@@ -91,14 +93,14 @@ class CommandTelemetryServer:
         self.command_server = one_client_server.OneClientServer(
             name="Command",
             host=host,
-            port=0 if self.use_random_ports else constants.COMMAND_PORT,
+            port=0 if port == 0 else port + 1,
             log=log,
             connect_callback=self.command_connect_callback,
         )
         self.telemetry_server = one_client_server.OneClientServer(
             name="Telemetry",
             host=host,
-            port=0 if self.use_random_ports else constants.TELEMETRY_PORT,
+            port=port,
             log=log,
             connect_callback=self.telemetry_connect_callback,
         )
