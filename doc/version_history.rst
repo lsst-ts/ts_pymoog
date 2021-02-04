@@ -6,6 +6,21 @@
 Version History
 ###############
 
+v0.15.0
+=======
+
+* `CommandTelemetryServer`: improve handling of invalid headers:
+
+    * Flush the remaining data and try to continue, instead of disconnecting.
+    * Print the header bytes when an unrecognized frame ID is read.
+
+Requires:
+
+* ts_salobj 6.1
+* ts_idl 2.2
+* ts_xml 7
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for SimpleCsc and unit tests)
+
 v0.14.0
 =======
 
