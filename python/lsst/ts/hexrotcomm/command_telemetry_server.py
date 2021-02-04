@@ -206,8 +206,8 @@ class CommandTelemetryServer:
                         self.log.exception("telemetry_callback failed.")
                 else:
                     self.log.error(
-                        f"Invalid telemetry read: unknown frame_id={self.header.frame_id}; "
-                        "closing the writer."
+                        f"Invalid header read: unknown frame_id={self.header.frame_id}; "
+                        f"closing the writer. Bytes: {bytes(self.header)}"
                     )
                     break
             except asyncio.CancelledError:
