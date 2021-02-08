@@ -99,7 +99,8 @@ class OneClientServer:
             return
         self.reader = reader
         self.writer = writer
-        self.connected_task.set_result(None)
+        if not self.connected_task.done():
+            self.connected_task.set_result(None)
         self.call_connect_callback()
 
     async def start(self):
