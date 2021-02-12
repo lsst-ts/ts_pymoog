@@ -22,6 +22,7 @@
 __all__ = ["CommandTelemetryServer"]
 
 import asyncio
+import ctypes
 
 from . import structs
 from . import utils
@@ -187,6 +188,11 @@ class CommandTelemetryServer:
     async def read_telemetry_and_config(self):
         """Read telemetry and configuration from the Moog controller.
         """
+        # Compute the maximum number of bytes to read after the header
+        # if the header is not recognized, to flush the stream.
+        max_config_telemetry_bytes = max(
+            ctypes.sizeof(self.telemetry), ctypes.sizeof(self.config)
+        )
         while self.telemetry_connected:
             try:
                 await utils.read_into(self.telemetry_server.reader, self.header)
@@ -206,10 +212,18 @@ class CommandTelemetryServer:
                         self.log.exception("telemetry_callback failed.")
                 else:
                     self.log.error(
-                        f"Invalid telemetry read: unknown frame_id={self.header.frame_id}; "
-                        "closing the writer."
+                        f"Invalid header read: unknown frame_id={self.header.frame_id}; "
+                        f"flushing and continuing. Bytes: {bytes(self.header)}"
                     )
-                    break
+                    print(
+                        f"Invalid header read: unknown frame_id={self.header.frame_id}; "
+                        f"flushing and continuing. Bytes: {bytes(self.header)}"
+                    )
+                    data = await self.telemetry_server.reader.read(
+                        max_config_telemetry_bytes
+                    )
+                    self.log.info(f"Flushed {len(data)} bytes")
+                    print(f"Flushed {len(data)} bytes")
             except asyncio.CancelledError:
                 # No need to close the telemetry socket because whoever
                 # cancelled this task should do that.

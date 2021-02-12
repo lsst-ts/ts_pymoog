@@ -6,6 +6,23 @@
 Version History
 ###############
 
+v0.15.0
+=======
+
+* Update for ts_xml 7.2 (which is required for the unit tests to pass): add ``do_fault`` method to `SimpleCsc`.
+* `CommandTelemetryServer`: improve handling of invalid headers:
+
+    * Flush the remaining data and try to continue, instead of disconnecting.
+    * Print the header bytes when an unrecognized frame ID is read.
+* `OneClientServer`: bug fix: only set connected_task result if not already done.
+
+Requires:
+
+* ts_salobj 6.1
+* ts_idl 2.2
+* ts_xml 7.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.14.0
 =======
 
@@ -20,7 +37,7 @@ Requires:
 * ts_salobj 6.1
 * ts_idl 2.2
 * ts_xml 7
-* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for SimpleCsc and unit tests)
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
 
 v0.13.0
 =======
@@ -33,7 +50,7 @@ Requires:
 * ts_salobj 6.1
 * ts_idl 2.2
 * ts_xml 7
-* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for SimpleCsc and unit tests)
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
 
 v0.12.1
 =======
@@ -46,7 +63,7 @@ Requires:
 * ts_salobj 6.1
 * ts_idl 2.2
 * ts_xml 7
-* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for SimpleCsc and unit tests)
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
 
 v0.12.0
 =======
@@ -62,7 +79,7 @@ Requires:
 * ts_salobj 6.1
 * ts_idl 2.2
 * ts_xml 7
-* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for SimpleCsc and unit tests)
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
 
 v0.11.0
 =======
@@ -76,7 +93,7 @@ Requires:
 * ts_salobj 6.1
 * ts_idl 2.2
 * ts_xml 7
-* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for SimpleCsc and unit tests)
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
 
 v0.10.0
 =======
@@ -96,7 +113,7 @@ Requires:
 * ts_salobj 6.1
 * ts_idl 2
 * ts_xml 4.6 - 6
-* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for `SimpleCsc` and unit tests)
 
 v0.9.0
 ======
@@ -109,7 +126,7 @@ Requires:
 * ts_salobj 5.11 - 6.0
 * ts_idl 1 (with salobj 5) or 2 (with salobj 6)
 * ts_xml 4.6 - 6
-* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for `SimpleCsc` and unit tests)
 
 v0.8.0
 ======
@@ -129,7 +146,7 @@ Requires:
 * ts_salobj 5.11 - 6
 * ts_idl 1 (with salobj 5) or 2 (with salobj 6)
 * ts_xml 4.6 - 6
-* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for `SimpleCsc` and unit tests)
 
 v0.7.0
 ======
@@ -143,7 +160,7 @@ Requires:
 * ts_salobj 5.11 - 6
 * ts_idl 1 (with salobj 5) or 2 (with salobj 6)
 * ts_xml 4.6 - 6
-* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for `SimpleCsc` and unit tests)
 
 v0.6.0
 ======
@@ -157,7 +174,7 @@ Requires:
 * ts_salobj 5.11 - 6
 * ts_idl 1 (with salobj 5) or 2 (with salobj 6)
 * ts_xml 4.6 - 6
-* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for `SimpleCsc` and unit tests)
 
 v0.5.2
 ======
@@ -171,7 +188,7 @@ Requires:
 * ts_salobj 5.11
 * ts_idl 1
 * ts_xml 4.6
-* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for `SimpleCsc` and unit tests)
 
 v0.5.1
 ======
@@ -189,7 +206,7 @@ Requires:
 * ts_salobj 5.11
 * ts_idl 1
 * ts_xml 4.6
-* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for `SimpleCsc` and unit tests)
 
 v0.5.0
 ======
@@ -203,7 +220,7 @@ Requires:
 * ts_salobj 5
 * ts_idl 1
 * ts_xml 4.6
-* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for `SimpleCsc` and unit tests)
 
 v0.4.0
 ======
@@ -221,7 +238,7 @@ Requires:
 * ts_salobj 5
 * ts_idl 1
 * ts_xml 4.6
-* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for `SimpleCsc` and unit tests)
 
 v0.3.0
 ======
@@ -237,7 +254,7 @@ Requires:
 * ts_salobj 5
 * ts_idl 1
 * ts_xml 4.6
-* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for `SimpleCsc` and unit tests)
 
 v0.2.0
 ======
@@ -255,7 +272,7 @@ Requires:
 * ts_salobj 5
 * ts_idl 1
 * ts_xml 4.6
-* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for `SimpleCsc` and unit tests)
 
 v0.1.1
 ======
@@ -266,7 +283,7 @@ Requires:
 
 * ts_salobj 5
 * ts_idl 1
-* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for `SimpleCsc` and unit tests)
 
 v0.1.0
 ======
@@ -277,4 +294,4 @@ Requires:
 
 * ts_salobj 5
 * ts_idl 1
-* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for SimpleCsc and unit tests)
+* Rotator IDL file, e.g. built using ``make_idl_file.py Rotator`` (for `SimpleCsc` and unit tests)
