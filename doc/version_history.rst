@@ -15,6 +15,7 @@ v0.15.0
     * Flush the remaining data and try to continue, instead of disconnecting.
     * Print the header bytes when an unrecognized frame ID is read.
 * `OneClientServer`: bug fix: only set connected_task result if not already done.
+* Modernize ``doc/conf.py`` for documenteer 0.6.
 
 Requires:
 
