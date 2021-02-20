@@ -29,11 +29,11 @@ from lsst.ts.idl.enums.MTRotator import ControllerState
 from lsst.ts import hexrotcomm
 
 # Standard timeout for TCP/IP messages (sec).
-STD_TIMEOUT = 0.01
+TCP_TIMEOUT = 0.01
 
 # Time to wait for a reconnection attempt (sec).
 RECONNECT_TIMEOUT = (
-    hexrotcomm.SimpleMockController.connect_retry_interval * 3 + STD_TIMEOUT
+    hexrotcomm.SimpleMockController.connect_retry_interval * 3 + TCP_TIMEOUT
 )
 
 logging.basicConfig()
@@ -142,7 +142,7 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         connect_coro = asyncio.open_connection(
             host=hexrotcomm.LOCAL_HOST, port=self.server.command_port
         )
-        reader, writer = await asyncio.wait_for(connect_coro, timeout=STD_TIMEOUT)
+        reader, writer = await asyncio.wait_for(connect_coro, timeout=TCP_TIMEOUT)
         self.writers.append(writer)
         return reader, writer
 
@@ -154,16 +154,16 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         connect_coro = asyncio.open_connection(
             host=hexrotcomm.LOCAL_HOST, port=self.server.telemetry_port
         )
-        reader, writer = await asyncio.wait_for(connect_coro, timeout=STD_TIMEOUT)
+        reader, writer = await asyncio.wait_for(connect_coro, timeout=TCP_TIMEOUT)
         self.writers.append(writer)
         return reader, writer
 
     async def next_config(self):
         """Wait for next config."""
-        return await asyncio.wait_for(self.config_queue.get(), timeout=STD_TIMEOUT)
+        return await asyncio.wait_for(self.config_queue.get(), timeout=TCP_TIMEOUT)
 
     async def assert_next_connected(
-        self, command, telemetry, skip=0, timeout=STD_TIMEOUT
+        self, command, telemetry, skip=0, timeout=TCP_TIMEOUT
     ):
         """Assert results of next connect_callback.
 
@@ -268,18 +268,57 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
 
     async def test_bad_frame_id(self):
         """Test that sending a header with an unknown frame ID causes
-        the server to close the telemetry connection.
+        the server to flush the rest of the message and continue.
         """
         await self.assert_next_connected(command=False, telemetry=False)
         reader, writer = await self.open_telemetry_socket()
         await self.assert_next_connected(command=False, telemetry=True)
+
+        # Fill a telemetry struct with arbitrary data.
+        telemetry = hexrotcomm.SimpleTelemetry(
+            application_status=5,
+            state=1,
+            enabled_substate=2,
+            offline_substate=3,
+            curr_position=6.3,
+            cmd_position=-15.4,
+        )
+
+        # Write a header with invalid frame ID and telemetry data.
+        # The bad header should trigger an error log message
+        # and the data should be flushed.
         bad_frame_id = (
             hexrotcomm.SimpleTelemetry().FRAME_ID + hexrotcomm.SimpleConfig().FRAME_ID
         )
-        header = hexrotcomm.Header()
-        header.frame_id = bad_frame_id
-        await hexrotcomm.write_from(writer, header)
-        await self.assert_next_connected(command=False, telemetry=False)
+        bad_header = hexrotcomm.Header()
+        bad_header.frame_id = bad_frame_id
+        with self.assertLogs(level=logging.ERROR):
+            await hexrotcomm.write_from(writer, bad_header)
+            await hexrotcomm.write_from(writer, telemetry)
+            # Give the reader time to read and deal with the message.
+            await asyncio.sleep(TCP_TIMEOUT)
+        self.assertEqual(len(self.telemetry_list), 0)
+
+        # Write a good header and telemetry and test that they are read.
+        good_header = hexrotcomm.Header()
+        good_header.frame_id = telemetry.FRAME_ID
+        await hexrotcomm.write_from(writer, good_header)
+        await hexrotcomm.write_from(writer, telemetry)
+        # Give the reader time to read and deal with the message.
+        await asyncio.sleep(TCP_TIMEOUT)
+        self.assertEqual(len(self.telemetry_list), 1)
+        read_telemetry = self.telemetry_list[0]
+        for name in (
+            "application_status",
+            "state",
+            "enabled_substate",
+            "offline_substate",
+            "curr_position",
+            "cmd_position",
+        ):
+            self.assertEqual(
+                getattr(read_telemetry, name), getattr(telemetry, name), msg=name
+            )
 
     async def test_put_command_errors(self):
         """Test expected failures in CommandTelemetryServer.put_command.
@@ -366,11 +405,11 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
             reader and writer.
         """
         rejected_reader, rejected_writer = await connect_coroutine()
-        await asyncio.wait_for(rejected_reader.read(1000), STD_TIMEOUT)
+        await asyncio.wait_for(rejected_reader.read(1000), TCP_TIMEOUT)
         self.assertTrue(rejected_reader.at_eof())
         await hexrotcomm.close_stream_writer(rejected_writer)
         with self.assertRaises(asyncio.TimeoutError):
-            await asyncio.wait_for(self.connect_queue.get(), timeout=STD_TIMEOUT)
+            await asyncio.wait_for(self.connect_queue.get(), timeout=TCP_TIMEOUT)
 
     async def check_move(self, cmd_position, expected_counter, expected_position=None):
         """Command a position and check the result.

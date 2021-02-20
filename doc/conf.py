@@ -3,16 +3,14 @@
 This configuration only affects single-package Sphinx documentation builds.
 """
 
-from documenteer.sphinxconfig.stackconf import build_package_configs
-import lsst.ts.hexrotcomm
+from documenteer.conf.pipelinespkg import *  # noqa
+import lsst.ts.hexrotcomm  # noqa
 
-
-_g = globals()
-_g.update(
-    build_package_configs(
-        project_name="ts_hexrotcomm", version=lsst.ts.hexrotcomm.__version__
-    )
-)
+project = "ts_hexrotcomm"
+html_theme_options["logotext"] = project  # noqa
+html_title = project
+html_short_title = project
+doxylink = {}  # Avoid warning: Could not find tag file _doxygen/doxygen.tag
 
 intersphinx_mapping["ts_xml"] = ("https://ts-xml.lsst.io", None)  # noqa
 intersphinx_mapping["ts_salobj"] = ("https://ts-salobj.lsst.io", None)  # noqa

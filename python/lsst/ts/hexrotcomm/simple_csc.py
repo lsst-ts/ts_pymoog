@@ -145,6 +145,9 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     async def do_configureVelocity(self, data):
         raise salobj.ExpectedError("Not implemented")
 
+    async def do_fault(self, data):
+        raise salobj.ExpectedError("Not implemented")
+
     async def do_stop(self, data):
         raise salobj.ExpectedError("Not implemented")
 
