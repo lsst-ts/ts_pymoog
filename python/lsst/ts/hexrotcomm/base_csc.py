@@ -76,13 +76,17 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         Configuration structure.
     TelemetryClass : `ctypes.Structure`
         Telemetry structure.
-    schema_path : `str` or `pathlib.Path`
-        Path to a schema file used to validate configuration files
+    schema_path : `str`, `pathlib.Path` or `None`, optional
+        Path to a schema file used to validate configuration files.
+        This is deprecated; new code should specify ``config_schema`` instead.
         The recommended path is ``<package_root>/"schema"/f"{name}.yaml"``
         for example:
 
             schema_path = pathlib.Path(__file__).resolve().parents[4] \
                 / "schema" / f"{name}.yaml"
+    config_schema : `dict` or None, optional
+        Configuration schema, as a dict in jsonschema format.
+        Exactly one of ``schema_path`` or ``config_schema`` must not be None.
     config_dir : `str`, optional
         Directory of configuration files, or None for the standard
         configuration directory (obtained from `_get_default_config_dir`).
@@ -135,7 +139,8 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         CommandCode,
         ConfigClass,
         TelemetryClass,
-        schema_path,
+        schema_path=None,
+        config_schema=None,
         config_dir=None,
         initial_state=salobj.State.OFFLINE,
         settings_to_apply="",
@@ -161,6 +166,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
             index=index,
             schema_path=schema_path,
             config_dir=config_dir,
+            config_schema=config_schema,
             initial_state=initial_state,
             settings_to_apply=settings_to_apply,
             simulation_mode=simulation_mode,
