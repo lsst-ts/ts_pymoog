@@ -6,8 +6,23 @@
 Version History
 ###############
 
+v0.16.0
+-------
+
+* `BaseCsc`: add ``config_schema`` constructor argument.
+  This requires ts_salobj 6.3.
+* `SimpleCsc`: specify config schema using the ``config_schema`` argument.
+* Delete obsolete file ``schema/MTRotator.yaml``.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 2.2
+* ts_xml 7.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.15.0
-=======
+-------
 
 * Update for ts_xml 7.2 (which is required for the unit tests to pass): add ``do_fault`` method to `SimpleCsc`.
 * `CommandTelemetryServer`: improve handling of invalid headers:
@@ -25,7 +40,7 @@ Requires:
 * MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
 
 v0.14.0
-=======
+-------
 
 * Support different ports for different CSCs:
 
@@ -41,7 +56,7 @@ Requires:
 * MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
 
 v0.13.0
-=======
+-------
 
 * Add optional ``set_simulation_mode`` constructor argument to `BaseCsc` and `SimpleCsc`.
   This is a backwards compatible change.
@@ -54,7 +69,7 @@ Requires:
 * MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
 
 v0.12.1
-=======
+-------
 
 * Update Jenkinsfile.conda to use Jenkins Shared Library
 * Pinned the ts-idl and ts-salobj version in conda recipe
@@ -67,7 +82,7 @@ Requires:
 * MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
 
 v0.12.0
-=======
+-------
 
 * Update the mock controller to make the time used in update_telemetry match the time in the header:
 
@@ -83,7 +98,7 @@ Requires:
 * MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
 
 v0.11.0
-=======
+-------
 
 * Update for ts_xml 7 and ts_idl 2.2:
 
@@ -97,7 +112,7 @@ Requires:
 * MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
 
 v0.10.0
-=======
+-------
 
 * Update for ts_salobj 6.1.
 * Update the handling of initial_state in `BaseCsc`:
