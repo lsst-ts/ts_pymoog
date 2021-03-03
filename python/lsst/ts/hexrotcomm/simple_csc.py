@@ -21,11 +21,10 @@
 
 __all__ = ["SimpleCsc"]
 
-import pathlib
-
 from lsst.ts import salobj
 from lsst.ts import hexrotcomm
 from lsst.ts.idl.enums.MTRotator import EnabledSubstate, ApplicationStatus
+from .config_schema import CONFIG_SCHEMA
 from . import simple_mock_controller
 
 
@@ -100,9 +99,6 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         self._prev_flags_tracking_success = False
         self._prev_flags_tracking_lost = False
 
-        schema_path = (
-            pathlib.Path(__file__).parents[4].joinpath("schema", "MTRotator.yaml")
-        )
         port = (
             simple_mock_controller.SIMPLE_TELEMETRY_PORT if simulation_mode == 0 else 0
         )
@@ -114,7 +110,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
             CommandCode=simple_mock_controller.SimpleCommandCode,
             ConfigClass=simple_mock_controller.SimpleConfig,
             TelemetryClass=simple_mock_controller.SimpleTelemetry,
-            schema_path=schema_path,
+            config_schema=CONFIG_SCHEMA,
             config_dir=config_dir,
             initial_state=initial_state,
             settings_to_apply=settings_to_apply,
