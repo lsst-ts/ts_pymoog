@@ -80,6 +80,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     """
 
     valid_simulation_modes = [0, 1]
+    version = "test"
 
     def __init__(
         self,
