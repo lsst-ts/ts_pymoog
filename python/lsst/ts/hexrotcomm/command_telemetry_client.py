@@ -152,15 +152,17 @@ class CommandTelemetryClient:
         """Cancel command and telemetry loops and close the connections.
 
         Always safe to call.
-
-        Does not set the reader or writer attributes to None.
         """
         self.command_loop_task.cancel()
         self.telemetry_loop_task.cancel()
         if self.command_writer is not None:
-            await utils.close_stream_writer(self.command_writer)
+            command_writer = self.command_writer
+            self.command_writer = None
+            await utils.close_stream_writer(command_writer)
         if self.telemetry_writer is not None:
-            await utils.close_stream_writer(self.telemetry_writer)
+            telemetry_writer = self.telemetry_writer
+            self.telemetry_writer = None
+            await utils.close_stream_writer(telemetry_writer)
 
     async def connect(self):
         """Connect the sockets.
@@ -193,7 +195,9 @@ class CommandTelemetryClient:
         This will wait forever for a connection.
         """
         if self.command_writer is not None:
-            await utils.close_stream_writer(self.command_writer)
+            writer = self.command_writer
+            self.command_writer = None
+            await utils.close_stream_writer(writer)
         while True:
             try:
                 self.log.debug(
@@ -218,7 +222,9 @@ class CommandTelemetryClient:
         This will wait forever for a connection.
         """
         if self.telemetry_writer is not None:
-            await utils.close_stream_writer(self.telemetry_writer)
+            writer = self.telemetry_writer
+            self.telemetry_writer = None
+            await utils.close_stream_writer(writer)
         while True:
             try:
                 self.log.debug(
