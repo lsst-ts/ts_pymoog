@@ -22,8 +22,6 @@ import asyncio
 import pathlib
 import unittest
 
-import asynctest
-
 from lsst.ts import salobj
 from lsst.ts import hexrotcomm
 from lsst.ts.idl.enums.MTRotator import ControllerState
@@ -33,7 +31,7 @@ STD_TIMEOUT = 5  # timeout for command ack
 LOCAL_CONFIG_DIR = pathlib.Path(__file__).parent / "data" / "config"
 
 
-class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
+class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def basic_make_csc(
         self, config_dir=None, initial_state=salobj.State.OFFLINE, simulation_mode=1
     ):

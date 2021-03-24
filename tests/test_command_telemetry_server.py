@@ -23,8 +23,6 @@ import asyncio
 import logging
 import unittest
 
-import asynctest
-
 from lsst.ts.idl.enums.MTRotator import ControllerState
 from lsst.ts import hexrotcomm
 
@@ -39,11 +37,11 @@ RECONNECT_TIMEOUT = (
 logging.basicConfig()
 
 
-class CommandTelemetryServerTestCase(asynctest.TestCase):
+class CommandTelemetryServerTestCase(unittest.IsolatedAsyncioTestCase):
     """Test CommandTelemetryServer by connecting it to a SimpleMockController.
     """
 
-    async def setUp(self):
+    async def asyncSetUp(self):
         # Queue of (command_connected, telemetry_connected) filled by
         # the self.connect_callback
         self.connect_queue = asyncio.Queue()
@@ -78,7 +76,7 @@ class CommandTelemetryServerTestCase(asynctest.TestCase):
         # List of asyncio stream writers to close in tearDown
         self.writers = []
 
-    async def tearDown(self):
+    async def ascynTearDown(self):
         if self.mock_ctrl is not None:
             await self.mock_ctrl.close()
         for writer in self.writers:
