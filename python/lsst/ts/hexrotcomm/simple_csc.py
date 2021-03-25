@@ -80,6 +80,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     """
 
     valid_simulation_modes = [0, 1]
+    version = "test"
 
     def __init__(
         self,
@@ -196,10 +197,10 @@ class SimpleCsc(hexrotcomm.BaseCsc):
             )
         )
 
-        self.tel_application.set_put(
-            demand=server.telemetry.cmd_position,
-            position=server.telemetry.curr_position,
-            error=server.telemetry.curr_position - server.telemetry.cmd_position,
+        self.tel_rotation.set_put(
+            demandPosition=server.telemetry.cmd_position,
+            actualPosition=server.telemetry.curr_position,
+            timestamp=salobj.current_tai(),
         )
 
     def make_mock_controller(self, initial_ctrl_state):

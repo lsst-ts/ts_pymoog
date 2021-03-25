@@ -117,12 +117,17 @@ class OneClientServer:
         self.log.info(f"Server running: host={self.host}; port={self.port}")
 
     def call_connect_callback(self):
-        """Call the connect_callback if connection state has changed.
+        """Call self.connect_callback if the connection state has changed.
         """
         connected = self.connected
+        self.log.debug(
+            f"call_connect_callback: connected={connected}; "
+            f"last_connected={self._last_connected}"
+        )
         if self._last_connected != connected:
             if self.connect_callback is not None:
                 try:
+                    self.log.info("Calling connect_callback")
                     self.connect_callback(self)
                 except Exception:
                     self.log.exception("connect_callback failed.")
@@ -135,17 +140,15 @@ class OneClientServer:
             self.log.info("Closing the client socket.")
             if self.writer is None:
                 return
-            # Work around a bug in Python 3.7.6: if a StreamWriter is
-            # being closed then the next call to wait_closed on that writer
-            # may raise asyncio.CancelledError.
-            try:
-                await utils.close_stream_writer(self.writer)
-            except asyncio.CancelledError:
-                self.log.warning("close_client cancelled; continuing")
+
+            writer = self.writer
+            self.writer = None
+            await utils.close_stream_writer(writer)
             self.connected_task = asyncio.Future()
-            self.call_connect_callback()
         except Exception:
             self.log.exception("close_client failed; continuing")
+        finally:
+            self.call_connect_callback()
 
     async def close(self):
         """Close socket server and client socket and set the done_task done.

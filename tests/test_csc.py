@@ -22,8 +22,6 @@ import asyncio
 import pathlib
 import unittest
 
-import asynctest
-
 from lsst.ts import salobj
 from lsst.ts import hexrotcomm
 from lsst.ts.idl.enums.MTRotator import ControllerState
@@ -33,7 +31,7 @@ STD_TIMEOUT = 5  # timeout for command ack
 LOCAL_CONFIG_DIR = pathlib.Path(__file__).parent / "data" / "config"
 
 
-class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
+class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
     def basic_make_csc(
         self, config_dir=None, initial_state=salobj.State.OFFLINE, simulation_mode=1
     ):
@@ -124,17 +122,13 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
                 topic=self.remote.evt_controllerState,
                 controllerState=ControllerState.ENABLED,
             )
-            data = await self.remote.tel_application.next(
-                flush=True, timeout=STD_TIMEOUT
-            )
-            self.assertAlmostEqual(data.demand, 0)
+            data = await self.remote.tel_rotation.next(flush=True, timeout=STD_TIMEOUT)
+            self.assertAlmostEqual(data.demandPosition, 0)
             await self.remote.cmd_move.set_start(
                 position=destination, timeout=STD_TIMEOUT
             )
-            data = await self.remote.tel_application.next(
-                flush=True, timeout=STD_TIMEOUT
-            )
-            self.assertAlmostEqual(data.demand, destination)
+            data = await self.remote.tel_rotation.next(flush=True, timeout=STD_TIMEOUT)
+            self.assertAlmostEqual(data.demandPosition, destination)
 
     async def test_run_multiple_commands(self):
         """Test BaseCsc.run_multiple_commands.
@@ -147,14 +141,14 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, asynctest.TestCase):
             )
             telemetry_delay = self.csc.mock_ctrl.telemetry_interval * 3
 
-            # Record demand positions from the `application` telemetry topic.
+            # Record demand positions from the `rotation` telemetry topic.
             demand_positions = []
 
-            def application_callback(data):
-                if data.demand not in demand_positions:
-                    demand_positions.append(data.demand)
+            def rotation_callback(data):
+                if data.demandPosition not in demand_positions:
+                    demand_positions.append(data.demandPosition)
 
-            self.remote.tel_application.callback = application_callback
+            self.remote.tel_rotation.callback = rotation_callback
 
             # Wait for initial telemetry.
             await asyncio.sleep(telemetry_delay)
