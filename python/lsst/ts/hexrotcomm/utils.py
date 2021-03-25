@@ -27,13 +27,23 @@ import ctypes
 async def close_stream_writer(writer):
     """Close an asyncio.StreamWriter and wait for it to finish closing.
 
-    Safe to call even if the stream is closed or being closed, except...
+    Safe to call if the stream is closed or being closed, though in the
+    latter case this function may raise `asyncioCancelledError`.
 
-    Warning: this may raise `asyncio.CancelledError` if the stream
-    is already being closed. I suspect this is a bug in Python 3.7.6.
+    This function swallows `ConnectionResetError`, because that means
+    the stream writer is closed.
+
+    Raises
+    ------
+    asyncio.CancelledError
+        If the writer is already being closed.
+        I am not sure if this is expected behavior or a bug in Python.
     """
-    writer.close()
-    await writer.wait_closed()
+    try:
+        writer.close()
+        await writer.wait_closed()
+    except ConnectionResetError:
+        pass
 
 
 async def read_into(reader, struct):

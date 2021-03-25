@@ -6,6 +6,24 @@
 Version History
 ###############
 
+v0.17.0
+-------
+
+* `close_stream_writer`: swallow `ConnectionResetError`, since this means the writer is closing or closed.
+* `OneClientServer`: bug fix: ``connect_callback`` was not reliably called by ``close_client``.
+* `SimpleCsc`: update to write the ``rotation`` MTRotator telemetry topic,
+  instead of the deprecated ``application`` telemetry topic.
+* `CommandTelemetryClient`: always set a writer attribute to `None` when closing it,
+  to eliminate any danger of trying to close a writer twice.
+* Use `unittest.IsolatedAsyncioTestCase` instead of the abandoned asynctest package.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 2.2
+* ts_xml 7.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.16.0
 -------
 
