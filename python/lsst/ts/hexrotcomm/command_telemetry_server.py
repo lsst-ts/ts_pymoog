@@ -121,20 +121,17 @@ class CommandTelemetryServer:
 
     @property
     def connected(self):
-        """Return True if command and telemetry sockets are connected.
-        """
+        """Return True if command and telemetry sockets are connected."""
         return self.command_connected and self.telemetry_connected
 
     @property
     def command_connected(self):
-        """Return True if the command socket is connected.
-        """
+        """Return True if the command socket is connected."""
         return self.command_server.connected
 
     @property
     def telemetry_connected(self):
-        """Return True if the telemetry socket is connected.
-        """
+        """Return True if the telemetry socket is connected."""
         return self.telemetry_server.connected
 
     @property
@@ -166,8 +163,7 @@ class CommandTelemetryServer:
         return self.telemetry
 
     def command_connect_callback(self, command_server):
-        """Called when the command server connection state changes.
-        """
+        """Called when the command server connection state changes."""
         self.monitor_command_reader_task.cancel()
         if self.command_connected:
             self.monitor_command_reader_task = asyncio.create_task(
@@ -176,8 +172,7 @@ class CommandTelemetryServer:
         self.call_connect_callback()
 
     def telemetry_connect_callback(self, telemetry_server):
-        """Called when the telemetry server connection state changes.
-        """
+        """Called when the telemetry server connection state changes."""
         self.read_telemetry_and_config_task.cancel()
         if self.telemetry_connected:
             self.read_telemetry_and_config_task = asyncio.create_task(
@@ -186,8 +181,7 @@ class CommandTelemetryServer:
         self.call_connect_callback()
 
     async def read_telemetry_and_config(self):
-        """Read telemetry and configuration from the Moog controller.
-        """
+        """Read telemetry and configuration from the Moog controller."""
         # Compute the maximum number of bytes to read after the header
         # if the header is not recognized, to flush the stream.
         max_config_telemetry_bytes = max(
@@ -261,8 +255,7 @@ class CommandTelemetryServer:
         await utils.write_from(self.command_server.writer, command)
 
     async def monitor_command_reader(self):
-        """Monitor the command reader; if it closes then close the writer.
-        """
+        """Monitor the command reader; if it closes then close the writer."""
         # We do not expect to read any data, but we may as well accept it
         # if some comes in.
         try:
@@ -285,8 +278,7 @@ class CommandTelemetryServer:
         )
 
     async def start(self):
-        """Start command and telemetry TCP/IP servers.
-        """
+        """Start command and telemetry TCP/IP servers."""
         if self.start_task.done():
             raise RuntimeError("Cannot call start more than once.")
         await asyncio.gather(
@@ -294,8 +286,7 @@ class CommandTelemetryServer:
         )
 
     def call_connect_callback(self):
-        """Call the connect_callback if connection state has changed.
-        """
+        """Call the connect_callback if connection state has changed."""
         try:
             self.connect_callback(self)
         except Exception:

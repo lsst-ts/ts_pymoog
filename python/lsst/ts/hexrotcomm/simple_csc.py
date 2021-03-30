@@ -119,8 +119,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         )
 
     async def do_move(self, data):
-        """Specify a position.
-        """
+        """Specify a position."""
         self.assert_enabled_substate(EnabledSubstate.STATIONARY)
         if (
             not self.server.config.min_position

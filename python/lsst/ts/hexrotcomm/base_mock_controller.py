@@ -139,7 +139,8 @@ class BaseMockController(
 
     def assert_stationary(self):
         self.assert_state(
-            ControllerState.ENABLED, enabled_substate=EnabledSubstate.STATIONARY,
+            ControllerState.ENABLED,
+            enabled_substate=EnabledSubstate.STATIONARY,
         )
 
     def get_command_key(self, command):
@@ -169,7 +170,8 @@ class BaseMockController(
 
     async def do_enter_control(self, command):
         self.assert_state(
-            ControllerState.OFFLINE, offline_substate=OfflineSubstate.AVAILABLE,
+            ControllerState.OFFLINE,
+            offline_substate=OfflineSubstate.AVAILABLE,
         )
         self.set_state(ControllerState.STANDBY)
 
@@ -198,7 +200,10 @@ class BaseMockController(
         # requires two sequential CLEAR_COMMAND commands. For the mock
         # controller the first command will (probably) transition from FAULT
         # to STANDBY, but the second must be accepted without complaint.
-        if self.state not in (ControllerState.FAULT, ControllerState.STANDBY,):
+        if self.state not in (
+            ControllerState.FAULT,
+            ControllerState.STANDBY,
+        ):
             raise RuntimeError(
                 f"state={self.state!r}; must be FAULT or STANDBY for this command."
             )

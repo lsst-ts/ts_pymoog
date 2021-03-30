@@ -38,8 +38,8 @@ logging.basicConfig()
 
 
 class CommandTelemetryServerTestCase(unittest.IsolatedAsyncioTestCase):
-    """Test CommandTelemetryServer by connecting it to a SimpleMockController.
-    """
+    """Test CommandTelemetryServer by connecting it to a
+    SimpleMockController."""
 
     async def asyncSetUp(self):
         # Queue of (command_connected, telemetry_connected) filled by
@@ -187,8 +187,8 @@ class CommandTelemetryServerTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(telemetry, next_telemetry)
 
     async def assert_connected(self, command, telemetry):
-        """Assert that server command and/or telemetry sockets are connected.
-        """
+        """Assert that server command and/or telemetry sockets are
+        connected."""
         self.assertEqual(self.server.command_connected, command)
         self.assertEqual(self.server.telemetry_connected, telemetry)
         self.assertEqual(self.server.connected, command and telemetry)
@@ -319,8 +319,7 @@ class CommandTelemetryServerTestCase(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_put_command_errors(self):
-        """Test expected failures in CommandTelemetryServer.put_command.
-        """
+        """Test expected failures in CommandTelemetryServer.put_command."""
         command = hexrotcomm.Command()
         command.code = hexrotcomm.SimpleCommandCode.MOVE
         command.param1 = 0
