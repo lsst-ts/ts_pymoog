@@ -383,8 +383,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
 
     # Standard CSC commands.
     async def do_clearError(self, data):
-        """Reset the FAULT state to STANDBY.
-        """
+        """Reset the FAULT state to STANDBY."""
         self.assert_summary_state(salobj.State.FAULT, isbefore=True)
         # Two sequential commands are needed to clear error
         await self.run_command(
@@ -398,8 +397,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         self.assert_summary_state(salobj.State.STANDBY, isbefore=False)
 
     async def do_disable(self, data):
-        """Go from ENABLED state to DISABLED.
-        """
+        """Go from ENABLED state to DISABLED."""
         self.assert_summary_state(salobj.State.ENABLED, isbefore=True)
         await self.run_command(
             code=self.CommandCode.SET_STATE, param1=enums.SetStateParam.DISABLE
@@ -408,8 +406,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         self.assert_summary_state(salobj.State.DISABLED, isbefore=False)
 
     async def do_enable(self, data):
-        """Go from DISABLED state to ENABLED.
-        """
+        """Go from DISABLED state to ENABLED."""
         self.assert_summary_state(salobj.State.DISABLED, isbefore=True)
         await self.run_command(
             code=self.CommandCode.SET_STATE, param1=enums.SetStateParam.ENABLE
@@ -418,8 +415,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         self.assert_summary_state(salobj.State.ENABLED, isbefore=False)
 
     async def do_enterControl(self, data):
-        """Go from OFFLINE state, AVAILABLE offline substate to STANDBY.
-        """
+        """Go from OFFLINE state, AVAILABLE offline substate to STANDBY."""
         self.assert_summary_state(salobj.State.OFFLINE, isbefore=True)
         if self.server.telemetry.offline_substate != OfflineSubstate.AVAILABLE:
             raise salobj.ExpectedError(
@@ -432,8 +428,8 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         self.assert_summary_state(salobj.State.STANDBY, isbefore=False)
 
     async def do_exitControl(self, data):
-        """Go from STANDBY state to OFFLINE state, AVAILABLE offline substate.
-        """
+        """Go from STANDBY state to OFFLINE state, AVAILABLE offline
+        substate."""
         self.assert_summary_state(salobj.State.STANDBY, isbefore=True)
         await self.run_command(
             code=self.CommandCode.SET_STATE, param1=enums.SetStateParam.EXIT

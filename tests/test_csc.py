@@ -65,7 +65,8 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
                 continue
             with self.assertRaises(ValueError):
                 hexrotcomm.SimpleCsc(
-                    initial_state=bad_initial_state, simulation_mode=0,
+                    initial_state=bad_initial_state,
+                    simulation_mode=0,
                 )
 
     async def test_invalid_config(self):
@@ -113,8 +114,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
         await self.csc.run_multiple_commands(*commands, delay=delay)
 
     async def test_move(self):
-        """Test the move command.
-        """
+        """Test the move command."""
         destination = 2  # a small move so the test runs quickly
         async with self.make_csc(initial_state=salobj.State.ENABLED, simulation_mode=1):
             await self.assert_next_summary_state(salobj.State.ENABLED)
@@ -131,8 +131,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             self.assertAlmostEqual(data.demandPosition, destination)
 
     async def test_run_multiple_commands(self):
-        """Test BaseCsc.run_multiple_commands.
-        """
+        """Test BaseCsc.run_multiple_commands."""
         target_positions = (1, 2, 3)  # Small moves so the test runs quickly
         async with self.make_csc(initial_state=salobj.State.ENABLED, simulation_mode=1):
             await self.assert_next_sample(

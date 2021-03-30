@@ -75,8 +75,7 @@ class OneClientServer:
 
     @property
     def connected(self):
-        """Return True if a client is connected to this socket.
-        """
+        """Return True if a client is connected to this socket."""
         return not (
             self.writer is None or self.writer.is_closing() or self.reader.at_eof()
         )
@@ -104,8 +103,7 @@ class OneClientServer:
         self.call_connect_callback()
 
     async def start(self):
-        """Start TCP/IP server.
-        """
+        """Start TCP/IP server."""
         if self.server is not None:
             raise RuntimeError("Cannot call start more than once.")
         self.log.debug("Starting server")
@@ -117,8 +115,7 @@ class OneClientServer:
         self.log.info(f"Server running: host={self.host}; port={self.port}")
 
     def call_connect_callback(self):
-        """Call self.connect_callback if the connection state has changed.
-        """
+        """Call self.connect_callback if the connection state has changed."""
         connected = self.connected
         self.log.debug(
             f"call_connect_callback: connected={connected}; "
@@ -134,8 +131,7 @@ class OneClientServer:
             self._last_connected = connected
 
     async def close_client(self):
-        """Close the connected client socket, if any.
-        """
+        """Close the connected client socket, if any."""
         try:
             self.log.info("Closing the client socket.")
             if self.writer is None:

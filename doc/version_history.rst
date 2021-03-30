@@ -6,6 +6,18 @@
 Version History
 ###############
 
+v0.17.1
+-------
+
+* Format the code with black 20.8b1.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 2.2
+* ts_xml 7.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.17.0
 -------
 

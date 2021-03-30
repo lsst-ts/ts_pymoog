@@ -50,8 +50,7 @@ class SimpleCommandCode(enum.IntEnum):
 
 
 class SimpleConfig(ctypes.Structure):
-    """Configuration of SimpleMockController.
-    """
+    """Configuration of SimpleMockController."""
 
     _pack_ = 1
     _fields_ = [
@@ -63,8 +62,7 @@ class SimpleConfig(ctypes.Structure):
 
 
 class SimpleTelemetry(ctypes.Structure):
-    """Telemetry from SimpleMockController.
-    """
+    """Telemetry from SimpleMockController."""
 
     _pack_ = 1
     _fields_ = [

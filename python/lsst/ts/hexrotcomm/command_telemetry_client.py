@@ -111,14 +111,12 @@ class CommandTelemetryClient:
 
     @property
     def connected(self):
-        """Return True if command and telemetry sockets are connected.
-        """
+        """Return True if command and telemetry sockets are connected."""
         return self.command_connected and self.telemetry_connected
 
     @property
     def command_connected(self):
-        """Return True if the command socket is connected.
-        """
+        """Return True if the command socket is connected."""
         return not (
             self.command_writer is None
             or self.command_writer.is_closing()
@@ -127,8 +125,7 @@ class CommandTelemetryClient:
 
     @property
     def telemetry_connected(self):
-        """Return True if the telemetry socket is connected.
-        """
+        """Return True if the telemetry socket is connected."""
         return not (
             self.telemetry_writer is None
             or self.telemetry_writer.is_closing()
@@ -242,8 +239,7 @@ class CommandTelemetryClient:
                 await asyncio.sleep(self.connect_retry_interval)
 
     async def command_loop(self):
-        """Read and execute commands.
-        """
+        """Read and execute commands."""
         self.log.info("command_loop begins")
         while self.command_reader is not None:
             try:
@@ -263,8 +259,7 @@ class CommandTelemetryClient:
                 raise
 
     async def telemetry_loop(self):
-        """Write configuration once, then telemetry at regular intervals.
-        """
+        """Write configuration once, then telemetry at regular intervals."""
         self.log.info("telemetry_loop begins")
         try:
             await self.write_config()
@@ -282,8 +277,7 @@ class CommandTelemetryClient:
             asyncio.ensure_future(self.connect_telemetry())
 
     async def write_config(self):
-        """Write the current configuration.
-        """
+        """Write the current configuration."""
         assert self.telemetry_writer is not None
         header, curr_tai = self.update_and_get_header(self.config.FRAME_ID)
         await utils.write_from(self.telemetry_writer, header, self.config)
