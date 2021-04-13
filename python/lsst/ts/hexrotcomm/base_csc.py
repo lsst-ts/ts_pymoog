@@ -160,6 +160,21 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         self.TelemetryClass = TelemetryClass
         self.sync_pattern = sync_pattern
         self.mock_ctrl = None
+
+        # Lock when writing a message to the low-level controller.
+        # You must acquire this lock before cancelling any task
+        # that may be writing to the low-level controller,
+        # in order to avoid writing an incomplete message
+        # and leaving data in the write buffer.
+        self.write_lock = asyncio.Lock()
+
+        # Lock when writing one command or sequences of commands to the
+        # low-level controller. The low-level controllers require sequences
+        # to do several things, such as move point to point (first set
+        # the new position, then command the move), and this prevents
+        # new commands from being issued during the sequence.
+        # To avoid deadlocks: if acquiring both _command_lock and write_lock
+        # then always acquire _command_lock first.
         self._command_lock = asyncio.Lock()
         super().__init__(
             name=name,
@@ -361,7 +376,8 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
                 param5=param5,
                 param6=param6,
             )
-            await self.server.put_command(command)
+            async with self.write_lock:
+                await self.server.put_command(command)
 
     async def run_multiple_commands(self, *commands, delay=None):
         """Run multiple commands, without allowing other commands to run
