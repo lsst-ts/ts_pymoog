@@ -6,6 +6,20 @@
 Version History
 ###############
 
+v0.18.0
+-------
+
+* `BaseCsc`: add ``write_lock`` attribute and aquire this lock while writing a command to the low-level controller.
+  You should acquire this lock before cancelling any task that sends commands to the low-level controller,
+  to prevent writing partial commands and leaving data in the TCP/IP stream buffer.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 2.2
+* ts_xml 7.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.17.1
 -------
 
