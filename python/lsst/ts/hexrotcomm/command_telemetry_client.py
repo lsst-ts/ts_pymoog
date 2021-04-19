@@ -23,8 +23,7 @@ __all__ = ["CommandTelemetryClient"]
 import abc
 import asyncio
 import math
-
-import astropy.time
+import time
 
 from lsst.ts import salobj
 from . import constants
@@ -300,12 +299,9 @@ class CommandTelemetryClient:
             Current time in header timestamp (TAI, unix seconds).
         """
         header = self.headers[frame_id]
-        curr_time = astropy.time.Time.now()
-        curr_tai = salobj.tai_from_utc(curr_time)
-        mjd_frac, mjd_days = math.modf(curr_time.utc.mjd)
-        header.mjd = int(mjd_days)
-        header.mjd_frac = mjd_frac
-        unix_frac, unix_sec = math.modf(curr_time.utc.unix)
+        curr_unix = time.time()
+        curr_tai = salobj.tai_from_utc(curr_unix)
+        unix_frac, unix_sec = math.modf(curr_unix)
         header.tv_sec = int(unix_sec)
         header.tv_nsec = int(unix_frac * 1e9)
         return header, curr_tai
