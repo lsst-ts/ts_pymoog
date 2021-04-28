@@ -376,8 +376,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
                 param5=param5,
                 param6=param6,
             )
-            async with self.write_lock:
-                await self.server.put_command(command)
+            await self.basic_run_command(command)
 
     async def run_multiple_commands(self, *commands, delay=None):
         """Run multiple commands, without allowing other commands to run
@@ -393,9 +392,20 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         """
         async with self._command_lock:
             for command in commands:
-                await self.server.put_command(command)
+                await self.basic_run_command(command)
                 if delay is not None:
                     await asyncio.sleep(delay)
+
+    async def basic_run_command(self, command):
+        """Acquire the write_lock and run the command.
+
+        Parameters
+        ----------
+        command : `Command`
+            Command to run, as constructed by `make_command`.
+        """
+        async with self.write_lock:
+            await self.server.put_command(command)
 
     # Standard CSC commands.
     async def do_clearError(self, data):
