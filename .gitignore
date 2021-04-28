@@ -4,6 +4,7 @@ config.log
 *.cfgc
 *.pyc
 *.log
+.vscode
 
 # Built by sconsUtils
 version.py
