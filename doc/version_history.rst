@@ -6,6 +6,19 @@
 Version History
 ###############
 
+v0.18.1
+-------
+
+* `BaseCsc`: bug fix: ``run_commands`` did not acquire the new ``write_lock``.
+* `BaseCsc`: added method ``basic_run_command``.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 2.2
+* ts_xml 7.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.18.0
 -------
 
