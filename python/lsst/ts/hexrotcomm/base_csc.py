@@ -263,8 +263,8 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     def assert_commandable(self):
-        """Assert that the controller is connected and has CSC commands
-        enabled.
+        """Assert that CSC is connected to the low-level controller
+        and can command it.
         """
         if self.server is None:
             raise salobj.ExpectedError("No server")
@@ -276,8 +276,18 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
                 "use the EUI to enable CSC commands"
             )
 
+    def assert_enabled(self):
+        """Assert that the CSC is enabled.
+
+        First check that CSC can command the low-level controller.
+        """
+        self.assert_summary_state(salobj.State.ENABLED, isbefore=True)
+
     def assert_enabled_substate(self, substate):
-        """Assert the controller is enabled and in the specified substate.
+        """Assert that the CSC is enabled and that the low-level controller
+        is in the specified enabled substate.
+
+        First check that CSC can command the low-level controller.
 
         Parameters
         ----------
@@ -295,7 +305,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
     def assert_summary_state(self, *allowed_states, isbefore):
         """Assert that the current summary state is as specified.
 
-        Also checks that the controller is commandable.
+        First check that CSC can command the low-level controller.
 
         Used in do_xxx methods to check that a command is allowed.
 
@@ -376,8 +386,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
                 param5=param5,
                 param6=param6,
             )
-            async with self.write_lock:
-                await self.server.put_command(command)
+            await self.basic_run_command(command)
 
     async def run_multiple_commands(self, *commands, delay=None):
         """Run multiple commands, without allowing other commands to run
@@ -393,9 +402,20 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
         """
         async with self._command_lock:
             for command in commands:
-                await self.server.put_command(command)
+                await self.basic_run_command(command)
                 if delay is not None:
                     await asyncio.sleep(delay)
+
+    async def basic_run_command(self, command):
+        """Acquire the write_lock and run the command.
+
+        Parameters
+        ----------
+        command : `Command`
+            Command to run, as constructed by `make_command`.
+        """
+        async with self.write_lock:
+            await self.server.put_command(command)
 
     # Standard CSC commands.
     async def do_clearError(self, data):
