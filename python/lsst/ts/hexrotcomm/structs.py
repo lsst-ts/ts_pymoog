@@ -55,8 +55,6 @@ class Header(ctypes.Structure):
         ("sync_pattern", ctypes.c_ushort),
         ("frame_id", ctypes.c_ushort),
         ("counter", ctypes.c_uint),
-        ("mjd", ctypes.c_int),
-        ("mjd_frac", ctypes.c_double),
         ("tv_sec", ctypes.c_int64),
         ("tv_nsec", ctypes.c_long),
     ]

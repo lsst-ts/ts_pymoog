@@ -6,6 +6,19 @@
 Version History
 ###############
 
+v0.19.0
+-------
+
+* Update for changes to the low-level hexapod and rotator TCP/IP interfaces:
+  remove the mjd and mjd_frac fields from config and telemetry headers.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 2.2
+* ts_xml 7.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.18.1
 -------
 
