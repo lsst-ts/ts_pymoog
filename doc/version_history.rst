@@ -6,6 +6,22 @@
 Version History
 ###############
 
+v0.20.0
+-------
+
+* Change message headers to use TAI unix time.
+  Rename the fields from tv_sec, tv_nsec to tai_sec, tai_nsec and set them accordingly.
+  Note that this requires a corresponding update to the low-level rotator and hexapod controllers
+  (see `DM-26451 <https://jira.lsstcorp.org/browse/DM-26451>`_
+  and `DM-30120 <https://jira.lsstcorp.org/browse/DM-30120>`_)
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 2.2
+* ts_xml 7.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.19.0
 -------
 
