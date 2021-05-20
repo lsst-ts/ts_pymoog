@@ -22,12 +22,12 @@ __all__ = ["BaseMockController"]
 
 import abc
 
+from lsst.ts import tcpip
 from lsst.ts.idl.enums.MTRotator import (
     ControllerState,
     OfflineSubstate,
     EnabledSubstate,
 )
-from . import constants
 from . import enums
 from . import command_telemetry_client
 
@@ -91,7 +91,7 @@ class BaseMockController(
         telemetry,
         command_port,
         telemetry_port,
-        host=constants.LOCAL_HOST,
+        host=tcpip.LOCAL_HOST,
         initial_state=ControllerState.OFFLINE,
     ):
         self.CommandCode = CommandCode

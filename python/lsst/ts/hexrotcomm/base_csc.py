@@ -24,10 +24,10 @@ __all__ = ["BaseCsc"]
 import abc
 import asyncio
 
+from lsst.ts import tcpip
 from lsst.ts import salobj
 from lsst.ts.idl.enums.MTRotator import ControllerState, OfflineSubstate
 from . import enums
-from . import constants
 from . import structs
 from . import command_telemetry_server
 
@@ -211,7 +211,7 @@ class BaseCsc(salobj.ConfigurableCsc, metaclass=abc.ABCMeta):
 
     async def start(self):
         simulating = self.simulation_mode != 0
-        host = constants.LOCAL_HOST if simulating else None
+        host = tcpip.LOCAL_HOST if simulating else None
         self.server = command_telemetry_server.CommandTelemetryServer(
             host=host,
             port=self.port,
