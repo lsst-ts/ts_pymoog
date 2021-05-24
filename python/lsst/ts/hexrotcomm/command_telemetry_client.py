@@ -24,10 +24,9 @@ import abc
 import asyncio
 import math
 
+from lsst.ts import tcpip
 from lsst.ts import salobj
-from . import constants
 from . import structs
-from . import utils
 
 
 class CommandTelemetryClient:
@@ -80,7 +79,7 @@ class CommandTelemetryClient:
         telemetry,
         command_port,
         telemetry_port,
-        host=constants.LOCAL_HOST,
+        host=tcpip.LOCAL_HOST,
     ):
         self.log = log.getChild("BaseMockController")
         self.config = config
@@ -153,11 +152,11 @@ class CommandTelemetryClient:
         if self.command_writer is not None:
             command_writer = self.command_writer
             self.command_writer = None
-            await utils.close_stream_writer(command_writer)
+            await tcpip.close_stream_writer(command_writer)
         if self.telemetry_writer is not None:
             telemetry_writer = self.telemetry_writer
             self.telemetry_writer = None
-            await utils.close_stream_writer(telemetry_writer)
+            await tcpip.close_stream_writer(telemetry_writer)
 
     async def connect(self):
         """Connect the sockets.
@@ -192,7 +191,7 @@ class CommandTelemetryClient:
         if self.command_writer is not None:
             writer = self.command_writer
             self.command_writer = None
-            await utils.close_stream_writer(writer)
+            await tcpip.close_stream_writer(writer)
         while True:
             try:
                 self.log.debug(
@@ -219,7 +218,7 @@ class CommandTelemetryClient:
         if self.telemetry_writer is not None:
             writer = self.telemetry_writer
             self.telemetry_writer = None
-            await utils.close_stream_writer(writer)
+            await tcpip.close_stream_writer(writer)
         while True:
             try:
                 self.log.debug(
@@ -242,7 +241,7 @@ class CommandTelemetryClient:
         while self.command_reader is not None:
             try:
                 command = structs.Command()
-                await utils.read_into(self.command_reader, command)
+                await tcpip.read_into(self.command_reader, command)
                 await self.run_command(command)
             except asyncio.CancelledError:
                 raise
@@ -264,7 +263,7 @@ class CommandTelemetryClient:
             while self.telemetry_connected:
                 header, curr_tai = self.update_and_get_header(self.telemetry.FRAME_ID)
                 await self.update_telemetry(curr_tai=curr_tai)
-                await utils.write_from(self.telemetry_writer, header, self.telemetry)
+                await tcpip.write_from(self.telemetry_writer, header, self.telemetry)
                 await asyncio.sleep(self.telemetry_interval)
             self.log.warning("Telemetry socket disconnected; reconnecting")
             asyncio.ensure_future(self.connect_telemetry())
@@ -278,7 +277,7 @@ class CommandTelemetryClient:
         """Write the current configuration."""
         assert self.telemetry_writer is not None
         header, curr_tai = self.update_and_get_header(self.config.FRAME_ID)
-        await utils.write_from(self.telemetry_writer, header, self.config)
+        await tcpip.write_from(self.telemetry_writer, header, self.config)
 
     def update_and_get_header(self, frame_id):
         """Update the config or telemetry header and return it and the time.
