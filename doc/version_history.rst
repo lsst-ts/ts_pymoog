@@ -6,6 +6,30 @@
 Version History
 ###############
 
+v0.21.0
+-------
+
+Deprecations:
+
+* You should obtain the following from ts_tcpip: OneClientServer, close_stream_writer, read_into, write_from, LOCAL_HOST.
+  At some point these symbols will no longer be available from ts_hexrotcomm.
+
+Changes:
+
+* Use the new ts_tcpip package.
+  Temporarily make the symbols that moved available in lsst.ts.hexrotcomm, for backwards compatibility.
+* Test black formatting with pytest instead of a custom unit test.
+
+Requires:
+
+* ts_salobj 6.3
+* ts_idl 2.2
+* ts_tcpip 0.1
+* ts_xml 7.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
+
+
 v0.20.0
 -------
 

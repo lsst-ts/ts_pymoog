@@ -30,8 +30,8 @@ __all__ = [
 import ctypes
 import enum
 
+from lsst.ts import tcpip
 from lsst.ts.idl.enums.MTRotator import ControllerState, ApplicationStatus
-from . import constants
 from . import base_mock_controller
 
 
@@ -104,7 +104,7 @@ class SimpleMockController(base_mock_controller.BaseMockController):
     def __init__(
         self,
         log,
-        host=constants.LOCAL_HOST,
+        host=tcpip.LOCAL_HOST,
         command_port=SIMPLE_TELEMETRY_PORT + 1,
         telemetry_port=SIMPLE_TELEMETRY_PORT,
         initial_state=ControllerState.OFFLINE,

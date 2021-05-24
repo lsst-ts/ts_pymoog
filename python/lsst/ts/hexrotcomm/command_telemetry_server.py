@@ -24,9 +24,8 @@ __all__ = ["CommandTelemetryServer"]
 import asyncio
 import ctypes
 
+from lsst.ts import tcpip
 from . import structs
-from . import utils
-from . import one_client_server
 
 
 class CommandTelemetryServer:
@@ -91,14 +90,14 @@ class CommandTelemetryServer:
         # note that the count will wrap around at some point determined
         # by the data type of Command.counter.
         self._command_counts = dict()
-        self.command_server = one_client_server.OneClientServer(
+        self.command_server = tcpip.OneClientServer(
             name="Command",
             host=host,
             port=0 if port == 0 else port + 1,
             log=log,
             connect_callback=self.command_connect_callback,
         )
-        self.telemetry_server = one_client_server.OneClientServer(
+        self.telemetry_server = tcpip.OneClientServer(
             name="Telemetry",
             host=host,
             port=port,
@@ -189,15 +188,15 @@ class CommandTelemetryServer:
         )
         while self.telemetry_connected:
             try:
-                await utils.read_into(self.telemetry_server.reader, self.header)
+                await tcpip.read_into(self.telemetry_server.reader, self.header)
                 if self.header.frame_id == self.config.FRAME_ID:
-                    await utils.read_into(self.telemetry_server.reader, self.config)
+                    await tcpip.read_into(self.telemetry_server.reader, self.config)
                     try:
                         self.config_callback(self)
                     except Exception:
                         self.log.exception("config_callback failed.")
                 elif self.header.frame_id == self.telemetry.FRAME_ID:
-                    await utils.read_into(self.telemetry_server.reader, self.telemetry)
+                    await tcpip.read_into(self.telemetry_server.reader, self.telemetry)
                     if not self._telemetry_task.done():
                         self._telemetry_task.set_result(None)
                     try:
@@ -252,7 +251,7 @@ class CommandTelemetryServer:
         # without having to know the data type of that field.
         command.counter = self._command_counts.get(command.code, 0) + 1
         self._command_counts[command.code] = command.counter
-        await utils.write_from(self.command_server.writer, command)
+        await tcpip.write_from(self.command_server.writer, command)
 
     async def monitor_command_reader(self):
         """Monitor the command reader; if it closes then close the writer."""

@@ -18,12 +18,21 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
+try:
+    from .version import *
+except ImportError:
+    __version__ = "?"
 
-from .constants import *
+from lsst.ts.tcpip import (
+    # OneClientServer,
+    close_stream_writer,
+    read_into,
+    write_from,
+    LOCAL_HOST,
+)
+
 from .enums import *
 from .structs import *
-from .utils import *
-from .one_client_server import *
 from .command_telemetry_client import *
 from .command_telemetry_server import *
 from .base_mock_controller import *
@@ -31,8 +40,3 @@ from .simple_mock_controller import *
 from .base_csc import *
 from .base_csc_test_case import *
 from .simple_csc import *
-
-try:
-    from .version import *
-except ImportError:
-    __version__ = "?"
