@@ -208,15 +208,10 @@ class CommandTelemetryServer:
                         f"Invalid header read: unknown frame_id={self.header.frame_id}; "
                         f"flushing and continuing. Bytes: {bytes(self.header)}"
                     )
-                    print(
-                        f"Invalid header read: unknown frame_id={self.header.frame_id}; "
-                        f"flushing and continuing. Bytes: {bytes(self.header)}"
-                    )
                     data = await self.telemetry_server.reader.read(
                         max_config_telemetry_bytes
                     )
                     self.log.info(f"Flushed {len(data)} bytes")
-                    print(f"Flushed {len(data)} bytes")
             except asyncio.CancelledError:
                 # No need to close the telemetry socket because whoever
                 # cancelled this task should do that.
@@ -225,7 +220,7 @@ class CommandTelemetryServer:
                 self.log.exception("Telemetry reader closed.")
                 break
             except Exception:
-                self.log.exception("Unexpected error reading telemetry.")
+                self.log.exception("Unexpected error reading telemetry stream.")
                 break
         await self.telemetry_server.close_client()
 
