@@ -190,6 +190,7 @@ class CommandTelemetryServer:
             try:
                 await tcpip.read_into(self.telemetry_server.reader, self.header)
                 if self.header.frame_id == self.config.FRAME_ID:
+                    self.log.info("Reading config message from low-level controller")
                     await tcpip.read_into(self.telemetry_server.reader, self.config)
                     try:
                         self.config_callback(self)
