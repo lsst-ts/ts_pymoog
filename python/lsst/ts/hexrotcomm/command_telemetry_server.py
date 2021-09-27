@@ -143,22 +143,10 @@ class CommandTelemetryServer:
         """Return the telemetry port; may be 0 if not started."""
         return self.telemetry_server.port
 
-    async def next_telemetry(self, skip=2):
-        """Wait for next telemetry.
-
-        Parameters
-        ----------
-        skip : `int` (optional)
-            Number of telemetry items to skip.
-            1 is ideal to wait for the result of a command,
-            because it avoids a race condition between sending
-            the command and seeing the result.
-        """
-        if skip < 0:
-            raise ValueError(f"skip={skip} must be >= 0")
-        for n in range(skip):
-            self._telemetry_task = asyncio.Future()
-            await self._telemetry_task
+    async def next_telemetry(self):
+        """Wait for next telemetry."""
+        self._telemetry_task = asyncio.Future()
+        await self._telemetry_task
         return self.telemetry
 
     def command_connect_callback(self, command_server):
@@ -208,15 +196,10 @@ class CommandTelemetryServer:
                         f"Invalid header read: unknown frame_id={self.header.frame_id}; "
                         f"flushing and continuing. Bytes: {bytes(self.header)}"
                     )
-                    print(
-                        f"Invalid header read: unknown frame_id={self.header.frame_id}; "
-                        f"flushing and continuing. Bytes: {bytes(self.header)}"
-                    )
                     data = await self.telemetry_server.reader.read(
                         max_config_telemetry_bytes
                     )
                     self.log.info(f"Flushed {len(data)} bytes")
-                    print(f"Flushed {len(data)} bytes")
             except asyncio.CancelledError:
                 # No need to close the telemetry socket because whoever
                 # cancelled this task should do that.
@@ -225,7 +208,7 @@ class CommandTelemetryServer:
                 self.log.exception("Telemetry reader closed.")
                 break
             except Exception:
-                self.log.exception("Unexpected error reading telemetry.")
+                self.log.exception("Unexpected error reading telemetry stream.")
                 break
         await self.telemetry_server.close_client()
 
