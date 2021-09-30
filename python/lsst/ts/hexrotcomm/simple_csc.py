@@ -21,6 +21,7 @@
 
 __all__ = ["SimpleCsc"]
 
+from lsst.ts import utils
 from lsst.ts import salobj
 from lsst.ts import hexrotcomm
 from lsst.ts.idl.enums.MTRotator import EnabledSubstate, ApplicationStatus
@@ -199,7 +200,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         self.tel_rotation.set_put(
             demandPosition=server.telemetry.cmd_position,
             actualPosition=server.telemetry.curr_position,
-            timestamp=salobj.current_tai(),
+            timestamp=utils.current_tai(),
         )
 
     def make_mock_controller(self, initial_ctrl_state):

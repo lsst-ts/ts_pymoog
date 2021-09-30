@@ -24,8 +24,8 @@ import abc
 import asyncio
 import math
 
+from lsst.ts import utils
 from lsst.ts import tcpip
-from lsst.ts import salobj
 from . import structs
 
 
@@ -297,7 +297,7 @@ class CommandTelemetryClient:
             Current time in header timestamp (TAI, unix seconds).
         """
         header = self.headers[frame_id]
-        curr_tai = salobj.current_tai()
+        curr_tai = utils.current_tai()
         tai_frac, tai_sec = math.modf(curr_tai)
         header.tai_sec = int(tai_sec)
         header.tai_nsec = int(tai_frac * 1e9)

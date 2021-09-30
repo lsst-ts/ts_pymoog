@@ -76,7 +76,7 @@ class CommandTelemetryServerTestCase(unittest.IsolatedAsyncioTestCase):
         # List of asyncio stream writers to close in tearDown
         self.writers = []
 
-    async def ascynTearDown(self):
+    async def asyncTearDown(self):
         if self.mock_ctrl is not None:
             await self.mock_ctrl.close()
         for writer in self.writers:
