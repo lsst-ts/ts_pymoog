@@ -6,6 +6,38 @@
 Version History
 ###############
 
+v0.22.0
+-------
+
+Changes:
+
+* Make state transition commands more reliable and more efficient:
+  allow more time for the low-level controller to implement the change,
+  and stop waiting as soon as the change is reported.
+* Updated to use ts_utils, which is required.
+* `BaseCsc`:
+
+    * Add ``wait_summary_state`` method.
+    * ``assert_summary_state`` method: deprecate the ``isbefore`` argument.
+
+* `CommandTelemetryServer`:
+
+    * Remove the `skip` argument of the ``next_telemetry`` method.
+      It is much better to check each telemetry packet for the data you are awaiting.
+    * Remove diagnostic print statements.
+
+* `test_command_telemetry_server.py`: fix test cleanup, which was not running due to a typo.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 6.3
+* ts_idl 2.2
+* ts_tcpip 0.1
+* ts_xml 7.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
+
 v0.21.0
 -------
 
@@ -27,8 +59,6 @@ Requires:
 * ts_tcpip 0.1
 * ts_xml 7.2
 * MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
-
-
 
 v0.20.0
 -------
