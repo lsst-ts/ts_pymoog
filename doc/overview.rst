@@ -9,34 +9,40 @@ Introduction
 ============
 
 Python code to communicate with the main telescope camera rotator and hexapod low level controllers (code running in PXI computers).
-Note that these controller use a rather strange :ref:`communication protocol <communication_protocol>`.
 Contents include:
 
 * `BaseCsc`: base class for the main telescope and hexapod Commandable SAL Components (CSCs).
+* `CommandTelemetryClient`: A TCP/IP client that communicates with the low level controllers to send commands and receive telemetry.
 * `BaseMockController`: base class for mock controllers.
-* `CommandTelemetryServer`: A TCP/IP server that communicates with the low level controllers to send commands and receive telemetry.
+* `CommandTelemetryServer`: A TCP/IP server for reading commands and writing telemetry.
+  Only one stream may be connected on each port.
+  `BaseMockController` inherits from this class.
 * `Command` and `Header`: C structures used for communication.
 * `SimpleMockController`: a simple mock controller for testing `BaseCsc` and `CommandTelemetryServer`.
 
-Note: Moog, the vendor that provided the low level controllers, also provided CSCs for the camera rotator and two hexapods.
-Moog implemented these as a single C++ program called the "wrapper" that acts as all three CSCs at once.
-We are replacing Moog's "wrapper" with Python CSCs which use this package for communication.
-
-.. _communication_protocol:
+.. _lsst.ts.hexrotcomm_communication_protocol:
 
 TCP/IP Communication Protocol
 =============================
 
-TCP/IP communication is surprising in several ways:
+The CSC communicates with the low-level controller using two unidirectional sockets:
+one to send commands to the low-level controller, the other to report configuration and state to the CSC.
+All data is sent as binary C data structures with no padding (the C structures are defined using ``__attribute__((__packed__))``).
 
-* It is backwards from what you might expect.
-  Each low level controller creates two _client_ sockets that connect to socket _servers_ in the CSC.
-  One socket is used to read commands and the other socket is used to write telemetry and configuration.
+The CSC connects to the low-level controller as part of the ``start`` command.
 
-* Despite using two sockets, each socket only transmits information in one direction.
-  The low level controller writes nothing to its command socket and reads nothing from its telemetry and configuration socket.
-  As a result the low level controller provides no clear feedback if it rejects a command (e.g. because the controller is disabled or the command asks for a motion that is out of limits).
+The CSC enables the low-level controller (including clearing errors) as part of the ``enable`` command.
 
-All data is sent as binary: C data structures with no padding (the C structures are defined using ``__attribute__((__packed__))``).
-There is no "end of data" indicator so no way to resynchronize if any bytes are lost.
-`CommandTelemetryServer` handles this by closing the telemetry connection if it cannot understand a telemetry or configuration message, then waiting for the low level controller to reconnect.
+The CSC disconnects from the low-level controller as part of the ``standby`` command.
+In addition, if the CSC loses its connection on either stream, it will disconnect both streams and go to fault state.
+
+If the low-level controller goes to fault state *while the CSC is enabled*,
+the CSC will also go to fault state, but remain connected.
+This gives users the ability to monitor recovery efforts using the EUI.
+Once you have resolved the underlying problem, you can recover the CSC using the usual command sequence:
+
+* ``standby``: the CSC disconnects (if connected).
+* ``start``: the CSC connects.
+* ``enable``: the CSC tries to clear the error, and, if successful, enables the low-level controller.
+  If the CSC cannot clear the error state, it remains in disabled state.
+  Once you have resolved the underlying problem, you can issue the ``enable`` command to try again (without having to go back to standby state).
