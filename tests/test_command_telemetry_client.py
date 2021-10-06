@@ -196,15 +196,15 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             next_command, next_telemetry = await asyncio.wait_for(
                 self.connect_queue.get(), timeout=timeout
             )
-        self.assertEqual(command, next_command)
-        self.assertEqual(telemetry, next_telemetry)
+        assert command == next_command
+        assert telemetry == next_telemetry
 
     def assert_connected(self, command, telemetry):
         """Assert that server command and/or telemetry sockets are
         connected."""
-        self.assertEqual(self.client.command_connected, command)
-        self.assertEqual(self.client.telemetry_connected, telemetry)
-        self.assertEqual(self.client.connected, command and telemetry)
+        assert self.client.command_connected == command
+        assert self.client.telemetry_connected == telemetry
+        assert self.client.connected == command and telemetry
 
     async def test_initial_conditions(self):
         self.assert_connected(command=True, telemetry=True)
@@ -212,10 +212,10 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(self.mock_ctrl.command_connected)
         self.assertTrue(self.mock_ctrl.telemetry_connected)
         config = await self.next_config()
-        self.assertEqual(config.min_position, self.initial_min_position)
-        self.assertEqual(config.max_position, self.initial_max_position)
+        assert config.min_position == self.initial_min_position
+        assert config.max_position == self.initial_max_position
         telemetry = await self.client.next_telemetry()
-        self.assertEqual(telemetry.cmd_position, self.initial_cmd_position)
+        assert telemetry.cmd_position == self.initial_cmd_position
         self.assertGreaterEqual(telemetry.curr_position, self.initial_cmd_position)
 
         # extra calls to client.connect should fail
@@ -237,10 +237,10 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
 
     async def test_move_command(self):
         config = await self.next_config()
-        self.assertEqual(config.min_position, self.initial_min_position)
-        self.assertEqual(config.max_position, self.initial_max_position)
+        assert config.min_position == self.initial_min_position
+        assert config.max_position == self.initial_max_position
         telemetry = await self.client.next_telemetry()
-        self.assertEqual(telemetry.cmd_position, self.initial_cmd_position)
+        assert telemetry.cmd_position == self.initial_cmd_position
 
         expected_counter = 0
         for good_position in (
@@ -305,7 +305,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             await hexrotcomm.write_from(writer, telemetry)
             # Give the reader time to read and deal with the message.
             await asyncio.sleep(STD_TIMEOUT)
-        self.assertEqual(len(self.telemetry_list), 0)
+        assert len(self.telemetry_list) == 0
 
         # Write a good header and telemetry and test that they are read.
         good_header = hexrotcomm.Header()
@@ -314,7 +314,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
         await hexrotcomm.write_from(writer, telemetry)
         # Give the reader time to read and deal with the message.
         await asyncio.sleep(STD_TIMEOUT)
-        self.assertEqual(len(self.telemetry_list), 1)
+        assert len(self.telemetry_list) == 1
         read_telemetry = self.telemetry_list[0]
         for name in (
             "application_status",
@@ -357,8 +357,8 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
         self.callbacks_raise = True
         await self.client.next_telemetry()
         config = await self.next_config()
-        self.assertEqual(config.min_position, self.initial_min_position)
-        self.assertEqual(config.max_position, self.initial_max_position)
+        assert config.min_position == self.initial_min_position
+        assert config.max_position == self.initial_max_position
         self.assertGreaterEqual(len(self.telemetry_list), 1)
         self.assert_connected(command=True, telemetry=True)
 
@@ -409,10 +409,10 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
         command.code = hexrotcomm.SimpleCommandCode.MOVE
         command.param1 = cmd_position
         await self.client.put_command(command)
-        self.assertEqual(command.counter, expected_counter)
+        assert command.counter == expected_counter
 
         telemetry = await self.client.next_telemetry()
-        self.assertEqual(telemetry.cmd_position, expected_position)
+        assert telemetry.cmd_position == expected_position
 
 
 class SimpleMockControllerTestCase(unittest.IsolatedAsyncioTestCase):
@@ -428,7 +428,3 @@ class SimpleMockControllerTestCase(unittest.IsolatedAsyncioTestCase):
                 host=None,
                 initial_state=ControllerState.ENABLED,
             )
-
-
-if __name__ == "__main__":
-    unittest.main()

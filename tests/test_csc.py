@@ -22,6 +22,8 @@ import asyncio
 import pathlib
 import unittest
 
+import pytest
+
 from lsst.ts import salobj
 from lsst.ts import hexrotcomm
 from lsst.ts.idl.enums.MTRotator import (
@@ -46,17 +48,17 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
 
     async def test_constructor_errors(self):
         for bad_initial_state in (0, salobj.State.OFFLINE, max(salobj.State) + 1):
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 hexrotcomm.SimpleCsc(initial_state=bad_initial_state, simulation_mode=1)
 
         for bad_simulation_mode in (-1, 0, 2):
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 hexrotcomm.SimpleCsc(
                     initial_state=salobj.State.STANDBY,
                     simulation_mode=bad_simulation_mode,
                 )
 
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             hexrotcomm.SimpleCsc(
                 initial_state=salobj.State.STANDBY,
                 simulation_mode=1,
@@ -67,7 +69,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
         for bad_initial_state in salobj.State:
             if bad_initial_state == salobj.State.STANDBY:
                 continue
-            with self.assertRaises(ValueError):
+            with pytest.raises(ValueError):
                 hexrotcomm.SimpleCsc(
                     initial_state=bad_initial_state,
                     simulation_mode=0,
@@ -88,13 +90,13 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
                         await self.remote.cmd_start.set_start(
                             settingsToApply=bad_config_name, timeout=STD_TIMEOUT
                         )
-                    self.assertEqual(self.csc.summary_state, salobj.State.STANDBY)
+                    assert self.csc.summary_state == salobj.State.STANDBY
 
             # Now try a valid config file
             await self.remote.cmd_start.set_start(
                 settingsToApply="valid.yaml", timeout=STD_TIMEOUT
             )
-            self.assertEqual(self.csc.summary_state, salobj.State.DISABLED)
+            assert self.csc.summary_state == salobj.State.DISABLED
 
     async def test_controller_fault(self):
         """Controller going to fault should send CSC to fault, error code 1"""
@@ -224,12 +226,12 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
                 controllerState=ControllerState.ENABLED,
             )
             data = await self.remote.tel_rotation.next(flush=True, timeout=STD_TIMEOUT)
-            self.assertAlmostEqual(data.demandPosition, 0)
+            assert data.demandPosition == pytest.approx(0)
             await self.remote.cmd_move.set_start(
                 position=destination, timeout=STD_TIMEOUT
             )
             data = await self.remote.tel_rotation.next(flush=True, timeout=STD_TIMEOUT)
-            self.assertAlmostEqual(data.demandPosition, destination)
+            assert data.demandPosition == pytest.approx(destination)
 
     async def test_run_multiple_commands(self):
         """Test BaseCsc.run_multiple_commands."""
@@ -267,18 +269,14 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             await self.csc.do_move(other_move)
 
             # task1 should have finished before the do_move command.
-            self.assertTrue(task1.done())
+            assert task1.done()
 
             # Wait for final telemetry.
             await asyncio.sleep(telemetry_delay)
 
             expected_positions = [0] + list(target_positions) + [other_move.position]
-            self.assertEqual(expected_positions, demand_positions)
+            assert expected_positions == demand_positions
 
     async def test_standard_state_transitions(self):
         async with self.make_csc(initial_state=salobj.State.STANDBY, simulation_mode=1):
             await self.check_standard_state_transitions(enabled_commands=("move",))
-
-
-if __name__ == "__main__":
-    unittest.main()
