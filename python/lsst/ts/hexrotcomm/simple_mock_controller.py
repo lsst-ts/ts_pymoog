@@ -30,6 +30,7 @@ __all__ = [
 import ctypes
 import enum
 
+from lsst.ts import tcpip
 from lsst.ts.idl.enums.MTRotator import ControllerState, ApplicationStatus
 from . import base_mock_controller
 
@@ -93,6 +94,17 @@ class SimpleMockController(base_mock_controller.BaseMockController):
         with other tests.
     initial_state : `lsst.ts.idl.enums.ControllerState` (optional)
         Initial state of mock controller.
+    host : `str` or `None`, optional
+        IP address for this server. Typically "127.0.0.1" (the default)
+        for an IPV4 server and "::" for an IPV6 server.
+        If `None` then bind to all network interfaces and run both
+        IPV4 and IPV6 servers.
+        Do not specify `None` with port=0 (see Raises section).
+
+    Raises
+    ------
+    ValueError
+        If host=None and port=0. See `CommandTelemetryServer` for details.
 
     Notes
     -----
@@ -104,6 +116,7 @@ class SimpleMockController(base_mock_controller.BaseMockController):
         self,
         log,
         port=SIMPLE_TELEMETRY_PORT,
+        host=tcpip.LOCAL_HOST,
         initial_state=ControllerState.OFFLINE,
     ):
         config = SimpleConfig()
@@ -119,6 +132,7 @@ class SimpleMockController(base_mock_controller.BaseMockController):
             config=config,
             telemetry=telemetry,
             port=port,
+            host=host,
             initial_state=initial_state,
         )
         self.telemetry.application_status = ApplicationStatus.DDS_COMMAND_SOURCE

@@ -412,5 +412,20 @@ class CommandTelemetryServerTestCase(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(telemetry.cmd_position, expected_position)
 
 
+class SimpleMockControllerTestCase(unittest.IsolatedAsyncioTestCase):
+    """Test SimpleMockController constructor errors."""
+
+    async def test_constructor_errors(self):
+        log = logging.getLogger()
+        # port=0 and host=None is not allowed
+        with pytest.raises(ValueError):
+            hexrotcomm.SimpleMockController(
+                log=log,
+                port=0,
+                host=None,
+                initial_state=ControllerState.ENABLED,
+            )
+
+
 if __name__ == "__main__":
     unittest.main()
