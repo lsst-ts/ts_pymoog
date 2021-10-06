@@ -35,9 +35,12 @@ STD_TIMEOUT = 5
 logging.basicConfig()
 
 
-class CommandTelemetryServerTestCase(unittest.IsolatedAsyncioTestCase):
-    """Test CommandTelemetryServer by connecting it to a
-    SimpleMockController."""
+class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
+    """Test CommandTelemetryClient and SimpleMockController.
+
+    SimpleMockController is a simple subclass of abstract base class
+    CommandTelemetryServer, so this tests CommandTelemetryServer as well.
+    """
 
     async def asyncSetUp(self):
         # Queue of (command_connected, telemetry_connected) filled by
