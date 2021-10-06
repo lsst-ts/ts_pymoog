@@ -42,8 +42,8 @@ properties:
     default: "127.0.0.1"
   port:
     description: >-
-      Command port number of the TCP/IP interface.
-      The telemetry port is one larger.
+      Telemetry port number of the TCP/IP interface.
+      The command port is one larger.
       Ignored for SimpleCsc, because it always runs in simulation mode.
     type: integer
     default: 0
