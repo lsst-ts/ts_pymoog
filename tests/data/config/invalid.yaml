@@ -1,3 +1,0 @@
-# An invalid config file
-# the schema has no valid fields, so any non-empty data will suffice
-invalid_field: invalid data

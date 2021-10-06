@@ -29,7 +29,6 @@ from lsst.ts.idl.enums.MTRotator import (
     ApplicationStatus,
 )
 from lsst.ts import salobj
-from .base_csc import CscStateControllerState
 
 # Standard timeout (sec)
 # Long to avoid unnecessary timeouts on slow CI systems.
@@ -51,7 +50,7 @@ class BaseCscTestCase(salobj.BaseCscTestCase):
     @contextlib.asynccontextmanager
     async def make_csc(
         self,
-        initial_state=salobj.State.OFFLINE,
+        initial_state=salobj.State.STANDBY,
         config_dir=None,
         simulation_mode=0,
         log_level=None,
@@ -102,17 +101,15 @@ class BaseCscTestCase(salobj.BaseCscTestCase):
             timeout=timeout,
             **kwargs,
         ):
-            if initial_state != self.csc.default_initial_state:
+            if initial_state == salobj.State.ENABLED:
                 # Wait for and check the intermediate controller state,
                 # so unit test code only needs to check the final state
                 # (don't swallow the final state, for backwards compatibility).
-                expected_states = salobj.get_expected_summary_states(
-                    initial_state=self.csc.default_initial_state,
-                    final_state=initial_state,
-                )
-                for state in expected_states[:-1]:
-                    controller_state = CscStateControllerState[state]
-                    print(f"Waiting for controller_state={controller_state!r}")
+                for controller_state in (
+                    ControllerState.OFFLINE,
+                    ControllerState.STANDBY,
+                    ControllerState.DISABLED,
+                ):
                     await self.assert_next_sample(
                         topic=self.remote.evt_controllerState,
                         controllerState=controller_state,
@@ -137,6 +134,6 @@ class BaseCscTestCase(salobj.BaseCscTestCase):
             name=name,
             index=index,
             exe_name=exe_name,
-            default_initial_state=salobj.State.OFFLINE,
+            default_initial_state=salobj.State.STANDBY,
             cmdline_args=cmdline_args,
         )
