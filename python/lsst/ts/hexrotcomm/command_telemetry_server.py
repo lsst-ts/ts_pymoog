@@ -43,19 +43,21 @@ class CommandTelemetryServer(abc.ABC):
     ----------
     log : `logging.Logger`
         Logger.
-    host : `str` or `None`
-        IP address for this server.
-        If `None` then bind to all network interfaces.
     port : `int`
         Port for telemetry and configuration;
         if nonzero then the command port will be one larger.
-        Specify 0 to choose random values for both ports;
-        this is recommended for unit tests, to avoid collision
-        with other unit tests.
+        Specify 0 to choose random values for both ports; this is recommended
+        for unit tests, to avoid collision with other unit tests.
+        Do not specify 0 with host=None (see Raises section).
     config : `ctypes.Structure`
         Configuration data. May be modified.
     telemetry : `ctypes.Structure`
         Telemetry data. Modified by `update_telemetry`.
+    host : `str` or `None`, optional
+        IP address for this server. Typically "127.0.0.1" for an IPV4 server
+        and "::" for an IPV6 server. If `None` then bind to all network
+        interfaces and probably run both IPV4 and IPV6 servers.
+        Do not specify `None` with port=0 (see Raises section).
 
     Attributes
     ----------
@@ -87,9 +89,19 @@ class CommandTelemetryServer(abc.ABC):
         Task for `telemetry_loop`.
         Not meant for public use, except possibly in unit tests.
 
+    Raises
+    ------
+    ValueError
+        If host=None and port=0. This is because host=None runs IPV4 and IPV6
+        servers, and port=0 will assign two different random ports for each
+        stream (command and telemetry), one for IPV4, the other for IPV6.
+        This, in turn, makes it impossible to determine the command_port and
+        telemetry_port properties. It is possible to support this use case,
+        but it's more trouble than it's worth.
+
     Notes
     -----
-    This class was designed as a parent class for `BaseMockController`.
+    Designed to be the parent class for `BaseMockController`.
     """
 
     # Interval between telemetry messages (seconds)
@@ -98,11 +110,16 @@ class CommandTelemetryServer(abc.ABC):
     def __init__(
         self,
         log,
-        host,
         port,
         config,
         telemetry,
+        host=tcpip.LOCAL_HOST,
     ):
+        if host is None and port == 0:
+            raise ValueError(
+                "You may not specify host=None and port=0; that makes it impossible "
+                "to determine the command_port and telemetry_port properties."
+            )
         self.log = log.getChild("CommandTelemetryServer")
         self.header = structs.Header()
         self.config = config
@@ -211,8 +228,8 @@ class CommandTelemetryServer(abc.ABC):
         )
         self.log.info(
             "CommandTelemetryServer started; "
-            f"command_port={self.command_port}; "
-            f"telemetry_port={self.telemetry_port}"
+            f"telemetry_port={self.telemetry_port}; "
+            f"command_port={self.command_port}"
         )
 
     async def command_loop(self):

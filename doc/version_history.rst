@@ -13,19 +13,25 @@ Changes:
 
 * Swap client and server, so the client runs in the CSC and the server runs in the mock controller.
   This change requires new versions of the low-level controller code: ts_hexapod_controller and ts_rotator_controller (see ts_mthexapod and ts_mtrotator for details).
+
 * `BaseCsc` changes:
 
     * Connect to the low-level controller as part of the ``start`` command.
     * Make the CSC summary state mostly independent of the low-level controller state (an excellent suggestion from Tiago).
       As part of the ``enable`` command, the CSC commands the low-level controller to its own enabled state,
       including clearing errors, if necessary.
-      See :ref:`communication protocol <lsst.ts.hexrotcomm_communication_protocol>` for details.
-    * Configuration should now include fields for TCP/IP host and port.
+      See :ref:`communication protocol <lsst.ts.hexrotcomm_communication_protocol>` for more information.
+    * Configuration should now include fields for TCP/IP host, port and connection_timeout.
+      An alternative for the first two is to override the default host and port properties.
     * The ``clearError`` command is no longer supported (and will be removed in a future ticket).
       Use the standard sequence ``standby``, ``start``, and ``enable`` to recover from errors.
     * The CSC is no longer alive in the OFFLINE state.
+    * Update to use `lsst.ts.idl.enums.MTRotator.ErrorCode`, which requires ts_idl 3.4.
 
-* Update to use `lsst.ts.idl.enums.MTRotator.ErrorCode`, which requires ts_idl 3.4.
+* `CommandTelemetryServer`: make the `host` constructor argument optional, with a default of ``tcpip.LOCAL_HOST``.
+  Also prohibit constructing with host=None and port=0, to make sure we can determine the randomly chosen ports.
+* Add optional ``host`` constructor argument to `BaseMockController` and `SimpleMockController`.
+* Add a ``Jenkinsfile``.
 * setup.cfg: add [options] section.
 
 Requires:

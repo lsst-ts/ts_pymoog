@@ -157,7 +157,6 @@ class CommandTelemetryClient:
         self.command_writer = None  # not written
         self.telemetry_reader = None  # not read
         self.telemetry_writer = None
-        self.connect_task = asyncio.create_task(self.connect())
         self.should_be_connected = False
 
         # The state of (command_connected, telemetry_connected)
@@ -176,6 +175,7 @@ class CommandTelemetryClient:
 
         self._read_telemetry_and_config_task = utils.make_done_future()
         self._monitor_command_reader_task = utils.make_done_future()
+        self.connect_task = asyncio.create_task(self.connect())
 
     @property
     def connected(self):

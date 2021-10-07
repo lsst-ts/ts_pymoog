@@ -59,8 +59,20 @@ class BaseMockController(CommandTelemetryServer, abc.ABC):
         Specify 0 to choose random values for both ports;
         this is recommended for unit tests, to avoid collision
         with other tests.
+        Do not specify 0 with host=None (see Raises section).
+    host : `str` or `None`, optional
+        IP address for this server. Typically "127.0.0.1" (the default)
+        for an IPV4 server and "::" for an IPV6 server.
+        If `None` then bind to all network interfaces and run both
+        IPV4 and IPV6 servers.
+        Do not specify `None` with port=0 (see Raises section).
     initial_state : `lsst.ts.idl.enums.ControllerState` (optional)
         Initial state of mock controller.
+
+    Raises
+    ------
+    ValueError
+        If host=None and port=0. See `CommandTelemetryServer` for details.
 
     Notes
     -----
@@ -82,6 +94,7 @@ class BaseMockController(CommandTelemetryServer, abc.ABC):
         config,
         telemetry,
         port,
+        host=tcpip.LOCAL_HOST,
         initial_state=ControllerState.OFFLINE,
     ):
         self.CommandCode = CommandCode
@@ -106,7 +119,7 @@ class BaseMockController(CommandTelemetryServer, abc.ABC):
 
         super().__init__(
             log=log,
-            host=tcpip.LOCAL_HOST,
+            host=host,
             config=config,
             telemetry=telemetry,
             port=port,
