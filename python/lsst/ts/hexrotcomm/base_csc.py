@@ -535,8 +535,8 @@ class BaseCsc(salobj.ConfigurableCsc):
             command_port = self.mock_ctrl.command_port
         else:
             host = self.host
-            telemetry_port = self.config.port
-            command_port = self.config.port + 1
+            telemetry_port = self.port
+            command_port = self.port + 1
         self.client = CommandTelemetryClient(
             log=self.log,
             ConfigClass=self.ConfigClass,
