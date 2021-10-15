@@ -61,53 +61,44 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     -----
     **Error Codes**
 
-    * 1: invalid data read on the telemetry socket
+    * `lsst.ts.idl.enums.MTRotator.ErrorCode.CONTROLLER_FAULT`:
+      The low-level controller went to fault state.
+    * `lsst.ts.idl.enums.MTRotator.ErrorCode.CONNECTION_LOST`:
+      Lost connection to the low-level controller.
 
-    Supported commands:
+    **SAL API**
 
-    * All standard state transition commands and clearError
+    This CSC implements a subset of the MTRotator SAL API.
+
+    Commands beyond the generic commands:
+
     * move
 
-    Supported events:
+    Events beyond the generic events:
 
-    * controllerState
+    * commandableByDDS
+    * configuration
     * connected
-    * summaryState
-    * settingsApplied
+    * controllerState
 
-    Supported telemetry:
+    Telemetry:
 
-    * Application
+    * rotation
     """
 
-    valid_simulation_modes = [0, 1]
+    valid_simulation_modes = [1]
     version = "test"
 
     def __init__(
         self,
         config_dir=None,
-        initial_state=salobj.State.OFFLINE,
-        simulation_mode=0,
+        initial_state=salobj.State.STANDBY,
+        simulation_mode=1,
         settings_to_apply="",
     ):
-        self.server = None
-        self.mock_ctrl = None
-        # Set this to 2 when trackStart is called, then decrement
-        # when telemetry is received. If > 0 or enabled_substate is
-        # SLEWING_OR_TRACKING then allow the track command.
-        # This solves the problem of allowing the track command
-        # immediately after the trackStart, before telemetry is received.
-        self._tracking_started_telemetry_counter = 0
-        self._prev_flags_tracking_success = False
-        self._prev_flags_tracking_lost = False
-
-        port = (
-            simple_mock_controller.SIMPLE_TELEMETRY_PORT if simulation_mode == 0 else 0
-        )
         super().__init__(
             name="MTRotator",
             index=0,
-            port=port,
             sync_pattern=hexrotcomm.SIMPLE_SYNC_PATTERN,
             CommandCode=simple_mock_controller.SimpleCommandCode,
             ConfigClass=simple_mock_controller.SimpleConfig,
@@ -123,14 +114,14 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         """Specify a position."""
         self.assert_enabled_substate(EnabledSubstate.STATIONARY)
         if (
-            not self.server.config.min_position
+            not self.client.config.min_position
             <= data.position
-            <= self.server.config.max_position
+            <= self.client.config.max_position
         ):
             raise salobj.ExpectedError(
                 f"position {data.position} not in range "
-                f"[{self.server.config.min_position}, "
-                f"{self.server.config.max_position}]"
+                f"[{self.client.config.min_position}, "
+                f"{self.client.config.max_position}]"
             )
         await self.run_command(
             code=simple_mock_controller.SimpleCommandCode.MOVE, param1=data.position
@@ -154,60 +145,57 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     async def do_trackStart(self, data):
         raise salobj.ExpectedError("Not implemented")
 
-    def config_callback(self, server):
+    def config_callback(self, client):
         """Called when the TCP/IP controller outputs configuration.
 
         Parameters
         ----------
-        server : `CommandTelemetryServer`
-            TCP/IP server.
+        client : `CommandTelemetryClient`
+            TCP/IP client.
         """
         self.evt_configuration.set_put(
-            positionAngleUpperLimit=server.config.max_position,
-            velocityLimit=server.config.max_velocity,
+            positionAngleUpperLimit=client.config.max_position,
+            velocityLimit=client.config.max_velocity,
             accelerationLimit=0,
-            positionAngleLowerLimit=server.config.min_position,
+            positionAngleLowerLimit=client.config.min_position,
             followingErrorThreshold=0,
             trackingSuccessPositionThreshold=0,
             trackingLostTimeout=0,
         )
         self.evt_commandableByDDS.set_put(state=True)
 
-    def telemetry_callback(self, server):
+    def telemetry_callback(self, client):
         """Called when the TCP/IP controller outputs telemetry.
 
         Parameters
         ----------
-        server : `CommandTelemetryServer`
-            TCP/IP server.
+        client : `CommandTelemetryClient`
+            TCP/IP client.
         """
-        self.evt_summaryState.set_put(summaryState=self.summary_state)
         # Strangely telemetry.state, offline_substate and enabled_substate
         # are all floats from the controller. But they should only have
         # integer value, so I output them as integers.
         self.evt_controllerState.set_put(
-            controllerState=int(server.telemetry.state),
-            offlineSubstate=int(server.telemetry.offline_substate),
-            enabledSubstate=int(server.telemetry.enabled_substate),
+            controllerState=int(client.telemetry.state),
+            offlineSubstate=int(client.telemetry.offline_substate),
+            enabledSubstate=int(client.telemetry.enabled_substate),
         )
         self.evt_commandableByDDS.set_put(
             state=bool(
-                server.telemetry.application_status
+                client.telemetry.application_status
                 & ApplicationStatus.DDS_COMMAND_SOURCE
             )
         )
 
         self.tel_rotation.set_put(
-            demandPosition=server.telemetry.cmd_position,
-            actualPosition=server.telemetry.curr_position,
+            demandPosition=client.telemetry.cmd_position,
+            actualPosition=client.telemetry.curr_position,
             timestamp=utils.current_tai(),
         )
 
     def make_mock_controller(self, initial_ctrl_state):
         return simple_mock_controller.SimpleMockController(
             log=self.log,
-            host=self.server.host,
             initial_state=initial_ctrl_state,
-            command_port=self.server.command_port,
-            telemetry_port=self.server.telemetry_port,
+            port=0,
         )

@@ -20,9 +20,8 @@
 
 __all__ = ["CommandTelemetryClient"]
 
-import abc
 import asyncio
-import math
+import ctypes
 
 from lsst.ts import utils
 from lsst.ts import tcpip
@@ -30,28 +29,92 @@ from . import structs
 
 
 class CommandTelemetryClient:
-    """Client for a mock Moog TCP/IP controller.
+    """TCP/IP Client for a Moog CSC.
 
-    The controller uses two TCP/IP _client_ sockets,
-    one to read commands and the other to write telemetry.
-    Both sockets must be connected for the controller to operate;
-    if either becomes disconnected the controller will stop moving,
-    close any open sockets and try to reconnect.
+    This connects to the low-level controller via two client sockets:
+    one to write commands and one to read telemetry and configuration.
+    This client will close both sockets if either becomes disconnected.
+
+    This client cannot be reconnected; once closed, you must create a new one.
 
     Parameters
     ----------
     log : `logging.Logger`
         Logger.
-    config : `ctypes.Structure`
-        Configuration data. May be modified.
-    telemetry : `ctypes.Structure`
-        Telemetry data. Modified by `update_telemetry`.
+    ConfigClass : `ctypes.Structure`
+        Class for configuration.
+    TelemetryClass : `ctypes.Structure`
+        Class for telemetry
+    host : `str`
+        IP address of CSC server.
     command_port : `int`
         Command socket port.
     telemetry_port : `int`
         Telemetry socket port.
-    host : `str` (optional)
-        IP address of CSC server.
+    connect_callback : callable
+        Function to call when a connection is made or dropped.
+        The function receives one argument: this client.
+    config_callback : callable
+        Function to call when configuration is read.
+        The function receives one argument: this client.
+    telemetry_callback : callable
+        Function to call when telemetry is read.
+        The function receives one argument: this client.
+    connect_timeout : `float`, optional
+        Time limit for a connection to be made (seconds).
+
+    Attributes
+    ----------
+    log : `logging.Logger`
+        A child of the ``log`` constructor argument.
+    header : ``Header``
+        The most recently read header
+        (which may be for config, telemetry, or unrecognized).
+    config : ``ConfigClass``
+        The most recently read configuration.
+        A null-constructed instance before configuration is read.
+    telemetry : ``TelemetryClass``
+        The most recently read telemetry.
+        A null-constructed instance before telemetry is read.
+    host : `str`
+        The ``host`` constructor argument.
+    command_port : `int`
+        The ``command_port`` constructor argument.
+    telemetry_port : `int`
+        The ``telemetry_port`` constructor argument.
+    connect_callback : callable
+        The ``connect_callback`` constructor argument.
+    config_callback : callable
+        The ``config_callback`` constructor argument.
+    telemetry_callback : callable
+        The ``telemetry_callback`` constructor argument.
+    command_reader : `asyncio.StreamReader` or `None`
+        Do not touch. This class watches this reader
+        for disconnection of the command stream.
+        May be None if the command stream is not connected.
+    command_writer : `asynicio.StreamWriter` or `None`
+        Stream writer for sending commands to the low-level controller.
+        May be None if the command stream is not connected.
+    telemetry_reader : `asyncio.StreamReader`
+        Stream reader for reading configuration and telemetry messages
+        from the low-level controller.
+        May be None if the telemetry stream is not connected.
+    telemetry_writer : `asynicio.StreamWriter`
+        Only used to close the telemetry stream.
+        Don't write data to this stream, because the low-level controller
+        will ignore it.
+        May be None if the telemetry stream is not connected.
+    connect_task : `asyncio.Task`
+        A task for the `connect` method, which starts automatically
+        when this class is instantiated.
+        Set done when the client is connected to both streams.
+    should_be_connected : `bool`
+        Do we expect both streams to be connected?
+        If your connect_callback receives notice that one or both streams
+        is disconnected and ``should_be_connected`` is true, then the
+        the disconnection was unexpected and indicates a problem.
+        `connect` sets this true when it finishes successfully,
+        and `disconnect` set it false as it begins.
 
     Notes
     -----
@@ -65,45 +128,53 @@ class CommandTelemetryClient:
         await client.stop()
     """
 
-    telemetry_interval = 0.1
-    """Interval between telemetry messages (sec)."""
-
-    connect_retry_interval = 0.1
-    """Interval between connection retries (sec)."""
-
     def __init__(
         self,
         *,
         log,
-        config,
-        telemetry,
+        ConfigClass,
+        TelemetryClass,
+        host,
         command_port,
         telemetry_port,
-        host=tcpip.LOCAL_HOST,
+        connect_callback,
+        config_callback,
+        telemetry_callback,
+        connect_timeout=10,
     ):
         self.log = log.getChild("BaseMockController")
-        self.config = config
-        self.telemetry = telemetry
+        self.header = structs.Header()
+        self.config = ConfigClass()
+        self.telemetry = TelemetryClass()
+        self.host = host
         self.command_port = command_port
         self.telemetry_port = telemetry_port
-        self.host = host
-        self.headers = dict()
-        # A dictionary of frame ID: header for telemetry and config data
-        # Keeping separate headers for telemetry and config allows
-        # updating just the relevant fields, rather than creating a new
-        # header insteance for each telemetry and config message.
-        for frame_id in (config.FRAME_ID, telemetry.FRAME_ID):
-            header = structs.Header()
-            header.frame_id = frame_id
-            self.headers[frame_id] = header
+        self.connect_callback = connect_callback
+        self.config_callback = config_callback
+        self.telemetry_callback = telemetry_callback
+        self.connect_timeout = connect_timeout
         self.command_reader = None
         self.command_writer = None  # not written
         self.telemetry_reader = None  # not read
         self.telemetry_writer = None
-        self.command_loop_task = asyncio.Future()
-        self.command_loop_task.set_result(None)
-        self.telemetry_loop_task = asyncio.Future()
-        self.telemetry_loop_task.set_result(None)
+        self.should_be_connected = False
+
+        # The state of (command_connected, telemetry_connected)
+        # the last time connect_callback was called.
+        self._was_connected = (False, False)
+
+        # Dict of command_code: number of times this command has been sent;
+        # note that the count will wrap around at some point determined
+        # by the data type of Command.counter.
+        self._command_counts = dict()
+
+        # Task the user can set to an asyncio.Future()
+        # in order to detect when the next telemetry is read.
+        # Only intended for unit tests.
+        self._telemetry_task = asyncio.Future()
+
+        self._read_telemetry_and_config_task = utils.make_done_future()
+        self._monitor_command_reader_task = utils.make_done_future()
         self.connect_task = asyncio.create_task(self.connect())
 
     @property
@@ -134,182 +205,211 @@ class CommandTelemetryClient:
 
         Always safe to call.
         """
-        self.log.debug("close()")
-        self.connect_task.cancel()
-        await self._basic_close()
-        self.command_reader = None
-        self.command_writer = None
-        self.telemetry_reader = None
-        self.telemetry_writer = None
+        self.should_be_connected = False
+        await self.basic_close()
 
-    async def _basic_close(self):
-        """Cancel command and telemetry loops and close the connections.
+    async def basic_close(self):
+        """Close without clearing self.should_be_connected.
 
         Always safe to call.
         """
-        self.command_loop_task.cancel()
-        self.telemetry_loop_task.cancel()
-        if self.command_writer is not None:
-            command_writer = self.command_writer
-            self.command_writer = None
-            await tcpip.close_stream_writer(command_writer)
-        if self.telemetry_writer is not None:
-            telemetry_writer = self.telemetry_writer
-            self.telemetry_writer = None
-            await tcpip.close_stream_writer(telemetry_writer)
+        self.connect_task.cancel()
+        self._monitor_command_reader_task.cancel()
+        self._read_telemetry_and_config_task.cancel()
+        self._telemetry_task.cancel()
+        if self.command_connected:
+            try:
+                await tcpip.close_stream_writer(self.command_writer)
+            except asyncio.CancelledError:
+                pass
+        if self.telemetry_connected:
+            try:
+                await tcpip.close_stream_writer(self.telemetry_writer)
+            except asyncio.CancelledError:
+                pass
+        self.call_connect_callback()
 
     async def connect(self):
-        """Connect the sockets.
-
-        Notes
-        -----
-        This will wait forever for a connection.
-        """
-        self.log.info("connect")
-        # Close any existing connection, so we only have one connection.
-        await self._basic_close()
-        self.log.debug("connect: making connections")
-        coroutines = []
-        if self.command_reader is None:
-            coroutines.append(self.connect_command())
-        if self.telemetry_writer is None:
-            coroutines.append(self.connect_telemetry())
-        if coroutines:
-            await asyncio.gather(*coroutines)
-
-        self.log.debug("connect: starting command and telemetry loops")
-        self.command_loop_task = asyncio.create_task(self.command_loop())
-        self.telemetry_loop_task = asyncio.create_task(self.telemetry_loop())
+        """Connect the sockets and start the background tasks."""
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(self.connect_command(), self.connect_telemetry()),
+                timeout=self.connect_timeout,
+            )
+            self.should_be_connected = True
+        except asyncio.CancelledError:
+            self.debug("connect cancelled")
+            await self.basic_close()
+            raise
+        except asyncio.TimeoutError:
+            self.log.error(
+                "Failed to connect to the server: "
+                f"timed out after {self.connect_timeout} seconds"
+            )
+            await self.basic_close()
+            raise
+        except Exception:
+            self.log.exception("Failed to connect to the server")
+            await self.basic_close()
+            raise
 
     async def connect_command(self):
-        """Connect or reconnect to the command socket.
+        """Connect to the command socket and start monitor_command_reader loop.
 
-        Notes
-        -----
-        This will wait forever for a connection.
+        Unlike high-level method `connect` this waits forever for a connection
+        and does not call self.basic_close on error.
         """
         if self.command_writer is not None:
-            writer = self.command_writer
-            self.command_writer = None
-            await tcpip.close_stream_writer(writer)
-        while True:
-            try:
-                self.log.debug(
-                    f"connect_command: connect to host={self.host}, port={self.command_port}"
-                )
-                (
-                    self.command_reader,
-                    self.command_writer,
-                ) = await asyncio.open_connection(
-                    host=self.host, port=self.command_port
-                )
-                return
-            except Exception as e:
-                self.log.warning(f"connect_command failed with {e}; retrying")
-                await asyncio.sleep(self.connect_retry_interval)
+            raise RuntimeError("A command connection was already made")
+        self.log.debug(
+            f"connect_command: connect to host={self.host}, port={self.command_port}"
+        )
+        self.command_reader, self.command_writer = await asyncio.open_connection(
+            host=self.host, port=self.command_port
+        )
+        self.log.debug("Command socket connected; starting command monitor")
+        self._monitor_command_reader_task = asyncio.create_task(
+            self.monitor_command_reader()
+        )
+        self.call_connect_callback()
 
     async def connect_telemetry(self):
-        """Connect or reconnect to the telemetry/configuration socket.
+        """Connect to the telemetry/configuration socket and start
+        read_telemetry_and_config loop.
 
-        Notes
-        -----
-        This will wait forever for a connection.
+        Unlike high-level method `connect` this waits forever for a connection
+        and does not call self.basic_close on error.
         """
-        if self.telemetry_writer is not None:
-            writer = self.telemetry_writer
-            self.telemetry_writer = None
-            await tcpip.close_stream_writer(writer)
-        while True:
-            try:
-                self.log.debug(
-                    f"connect_telemetry: connect to host={self.host}, port={self.telemetry_port}"
-                )
-                (
-                    self.telemetry_reader,
-                    self.telemetry_writer,
-                ) = await asyncio.open_connection(
-                    host=self.host, port=self.telemetry_port
-                )
-                return
-            except Exception as e:
-                self.log.warning(f"connect_telemetry failed with {e}; retrying")
-                await asyncio.sleep(self.connect_retry_interval)
+        if self.command_writer is not None:
+            raise RuntimeError("A telemetry connection was already made")
+        self.log.debug(
+            f"connect_telemetry: connect to host={self.host}, port={self.telemetry_port}"
+        )
+        self.telemetry_reader, self.telemetry_writer = await asyncio.open_connection(
+            host=self.host, port=self.telemetry_port
+        )
+        self.log.debug(
+            "Telemetry socket connected; starting telemetry and config read loop"
+        )
+        self._read_telemetry_and_config_task = asyncio.create_task(
+            self.read_telemetry_and_config()
+        )
+        self.call_connect_callback()
 
-    async def command_loop(self):
-        """Read and execute commands."""
-        self.log.info("command_loop begins")
-        while self.command_reader is not None:
+    def call_connect_callback(self):
+        """Call the connect_callback if connection state has changed."""
+        was_connected = (self.command_connected, self.telemetry_connected)
+        if was_connected != self._was_connected:
+            self._was_connected = was_connected
             try:
-                command = structs.Command()
-                await tcpip.read_into(self.command_reader, command)
-                await self.run_command(command)
-            except asyncio.CancelledError:
-                raise
-            except ConnectionError:
-                self.log.error("Command socket closed; reconnecting")
-                asyncio.ensure_future(self.connect_command())
-                raise
+                self.connect_callback(self)
             except Exception:
-                self.log.exception("command_loop failed; reconnecting")
-                # disconnect and try again
-                asyncio.ensure_future(self.connect_command())
-                raise
+                self.log.exception("connect_callback failed.")
+        else:
+            self.log.debug(
+                "call_connect_callback not calling connect_callback; no change"
+            )
 
-    async def telemetry_loop(self):
-        """Write configuration once, then telemetry at regular intervals."""
-        self.log.info("telemetry_loop begins")
+    async def monitor_command_reader(self):
+        """Monitor the command reader; if it closes then close the writer."""
+        # We do not expect to read any data, but we may as well accept it
+        # if some comes in.
         try:
-            await self.write_config()
-            while self.telemetry_connected:
-                header, curr_tai = self.update_and_get_header(self.telemetry.FRAME_ID)
-                await self.update_telemetry(curr_tai=curr_tai)
-                await tcpip.write_from(self.telemetry_writer, header, self.telemetry)
-                await asyncio.sleep(self.telemetry_interval)
-            self.log.warning("Telemetry socket disconnected; reconnecting")
-            asyncio.ensure_future(self.connect_telemetry())
+            while self.command_connected:
+                await self.command_reader.read(1000)
+                if not self.command_connected:
+                    self.log.debug(
+                        "monitor_command_reader: reader disconnected; closing client sockets"
+                    )
+                    await self.basic_close()
+                    return
+                if self.command_reader.at_eof():
+                    self.log.info("Command reader at eof; closing client sockets")
+                    return
+                else:
+                    self.log.warning("Unexpected data read from the command socket.")
+                    await asyncio.sleep(0.01)
         except asyncio.CancelledError:
-            pass
+            self.log.debug("monitor_command_reader cancelled")
+        except ConnectionError:
+            self.log.info("Command reader disconnected; closing client")
+            await self.basic_close()
         except Exception:
-            self.log.exception("telemetry_loop failed; reconnecting")
-            asyncio.ensure_future(self.connect_telemetry())
+            self.log.exception("monitor_command_reader failed; closing")
+            await self.basic_close()
 
-    async def write_config(self):
-        """Write the current configuration."""
-        assert self.telemetry_writer is not None
-        header, curr_tai = self.update_and_get_header(self.config.FRAME_ID)
-        await tcpip.write_from(self.telemetry_writer, header, self.config)
+    async def read_telemetry_and_config(self):
+        """Read telemetry and configuration from the Moog controller."""
+        # Compute the maximum number of bytes to read after the header
+        # if the header is not recognized, to flush the stream.
+        max_config_telemetry_bytes = max(
+            ctypes.sizeof(self.telemetry), ctypes.sizeof(self.config)
+        )
+        try:
+            while self.telemetry_connected:
+                await tcpip.read_into(self.telemetry_reader, self.header)
+                if self.header.frame_id == self.config.FRAME_ID:
+                    await tcpip.read_into(self.telemetry_reader, self.config)
+                    try:
+                        self.config_callback(self)
+                    except Exception:
+                        self.log.exception("config_callback failed.")
+                elif self.header.frame_id == self.telemetry.FRAME_ID:
+                    await tcpip.read_into(self.telemetry_reader, self.telemetry)
+                    if not self._telemetry_task.done():
+                        self._telemetry_task.set_result(None)
+                    try:
+                        self.telemetry_callback(self)
+                    except Exception:
+                        self.log.exception("telemetry_callback failed.")
+                else:
+                    self.log.error(
+                        f"Invalid header read: unknown frame_id={self.header.frame_id}; "
+                        f"flushing and continuing. Bytes: {bytes(self.header)}"
+                    )
+                    data = await self.telemetry_reader.read(max_config_telemetry_bytes)
+                    self.log.info(f"Flushed {len(data)} bytes")
+        except asyncio.CancelledError:
+            # No need to close the telemetry socket because whoever
+            # cancelled this task should do that.
+            raise
+        except ConnectionError:
+            self.log.exception("Telemetry reader closed.")
+        except Exception:
+            self.log.exception("Unexpected error reading telemetry stream.")
+        await self.basic_close()
 
-    def update_and_get_header(self, frame_id):
-        """Update the config or telemetry header and return it and the time.
+    async def next_telemetry(self):
+        """Wait for next telemetry."""
+        self._telemetry_task = asyncio.Future()
+        await self._telemetry_task
+        return self.telemetry
 
-        Call this prior to writing telemetry or configuration.
-
-        Parameters
-        ----------
-        frame_id : `int`
-            Frame ID of header to write.
-
-        Returns
-        -------
-        header : `structs.Header`
-            The header.
-        curr_tai : `float`
-            Current time in header timestamp (TAI, unix seconds).
-        """
-        header = self.headers[frame_id]
-        curr_tai = utils.current_tai()
-        tai_frac, tai_sec = math.modf(curr_tai)
-        header.tai_sec = int(tai_sec)
-        header.tai_nsec = int(tai_frac * 1e9)
-        return header, curr_tai
-
-    @abc.abstractmethod
-    async def run_command(self, command):
-        """Run a command.
+    async def put_command(self, command):
+        """Write a command to the controller.
 
         Parameters
         ----------
         command : `Command`
-            Command to run.
+            Command to write. Its counter field will be set.
+
+        Raises
+        ------
+        RuntimeError
+            If the command stream is not connected
+        ValueError
+            If ``command`` is not an instance of `structs.Command`.
         """
-        raise NotImplementedError()
+        if not self.command_connected:
+            raise RuntimeError("Command socket not connected")
+        if not isinstance(command, structs.Command):
+            raise ValueError(
+                f"command={command!r} must be an instance of structs.Command"
+            )
+
+        # Set command.counter to the next value (starting from 1).
+        # Note: this code allows command.counter to wrap around,
+        # without having to know the data type of that field.
+        command.counter = self._command_counts.get(command.code, 0) + 1
+        self._command_counts[command.code] = command.counter
+        await tcpip.write_from(self.command_writer, command)

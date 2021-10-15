@@ -86,14 +86,25 @@ class SimpleMockController(base_mock_controller.BaseMockController):
     ----------
     log : `logging.Logger`
         Logger.
-    host : `str` (optional)
-        IP address of server.
-    command_port : `int` (optional)
-        Command socket port.  This argument is intended for unit tests;
-        use the default value for normal operation.
-    telemetry_port : `int` (optional)
-        Telemetry socket port. This argument is intended for unit tests;
-        use the default value for normal operation.
+    port : `int`
+        Port for telemetry and configuration;
+        if nonzero then the command port will be one larger.
+        Specify 0 to choose random values for both ports;
+        this is recommended for unit tests, to avoid collision
+        with other tests.
+    initial_state : `lsst.ts.idl.enums.ControllerState` (optional)
+        Initial state of mock controller.
+    host : `str` or `None`, optional
+        IP address for this server. Typically "127.0.0.1" (the default)
+        for an IPV4 server and "::" for an IPV6 server.
+        If `None` then bind to all network interfaces and run both
+        IPV4 and IPV6 servers.
+        Do not specify `None` with port=0 (see Raises section).
+
+    Raises
+    ------
+    ValueError
+        If host=None and port=0. See `CommandTelemetryServer` for details.
 
     Notes
     -----
@@ -104,9 +115,8 @@ class SimpleMockController(base_mock_controller.BaseMockController):
     def __init__(
         self,
         log,
+        port=SIMPLE_TELEMETRY_PORT,
         host=tcpip.LOCAL_HOST,
-        command_port=SIMPLE_TELEMETRY_PORT + 1,
-        telemetry_port=SIMPLE_TELEMETRY_PORT,
         initial_state=ControllerState.OFFLINE,
     ):
         config = SimpleConfig()
@@ -121,11 +131,11 @@ class SimpleMockController(base_mock_controller.BaseMockController):
             extra_commands=extra_commands,
             config=config,
             telemetry=telemetry,
+            port=port,
             host=host,
-            command_port=command_port,
-            telemetry_port=telemetry_port,
             initial_state=initial_state,
         )
+        self.telemetry.application_status = ApplicationStatus.DDS_COMMAND_SOURCE
 
     async def do_config_velocity(self, command):
         self.assert_state(ControllerState.ENABLED)
@@ -151,7 +161,6 @@ class SimpleMockController(base_mock_controller.BaseMockController):
             )
 
     async def update_telemetry(self, curr_tai):
-        self.telemetry.application_status = ApplicationStatus.DDS_COMMAND_SOURCE
         self.telemetry.curr_position += 0.001
 
     async def end_run_command(self, **kwargs):

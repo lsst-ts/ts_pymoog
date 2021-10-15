@@ -29,19 +29,14 @@ from lsst.ts.idl.enums.MTRotator import (
     EnabledSubstate,
 )
 from . import enums
-from . import command_telemetry_client
+from .command_telemetry_server import CommandTelemetryServer
 
 
-class BaseMockController(
-    command_telemetry_client.CommandTelemetryClient, metaclass=abc.ABCMeta
-):
+class BaseMockController(CommandTelemetryServer, abc.ABC):
     """Base class for a mock Moog TCP/IP controller with states.
 
-    The controller uses two TCP/IP _client_ sockets,
+    The controller uses two TCP/IP server sockets,
     one to read commands and the other to write telemetry.
-    Both sockets must be connected for the controller to operate;
-    if either becomes disconnected the controller will stop moving,
-    close any open sockets and try to reconnect.
 
     Parameters
     ----------
@@ -58,14 +53,26 @@ class BaseMockController(
         Configuration data. May be modified.
     telemetry : `ctypes.Structure`
         Telemetry data. Modified by `update_telemetry`.
-    command_port : `int`
-        Command socket port.
-    telemetry_port : `int`
-        Telemetry socket port.
-    host : `str` (optional)
-        IP address of CSC server.
+    port : `int`
+        Port for telemetry and configuration;
+        if nonzero then the command port will be one larger.
+        Specify 0 to choose random values for both ports;
+        this is recommended for unit tests, to avoid collision
+        with other tests.
+        Do not specify 0 with host=None (see Raises section).
+    host : `str` or `None`, optional
+        IP address for this server. Typically "127.0.0.1" (the default)
+        for an IPV4 server and "::" for an IPV6 server.
+        If `None` then bind to all network interfaces and run both
+        IPV4 and IPV6 servers.
+        Do not specify `None` with port=0 (see Raises section).
     initial_state : `lsst.ts.idl.enums.ControllerState` (optional)
         Initial state of mock controller.
+
+    Raises
+    ------
+    ValueError
+        If host=None and port=0. See `CommandTelemetryServer` for details.
 
     Notes
     -----
@@ -79,9 +86,6 @@ class BaseMockController(
         await ctrl.stop()
     """
 
-    connect_retry_interval = 0.1
-    """Interval between connection retries (sec)."""
-
     def __init__(
         self,
         log,
@@ -89,8 +93,7 @@ class BaseMockController(
         extra_commands,
         config,
         telemetry,
-        command_port,
-        telemetry_port,
+        port,
         host=tcpip.LOCAL_HOST,
         initial_state=ControllerState.OFFLINE,
     ):
@@ -116,13 +119,11 @@ class BaseMockController(
 
         super().__init__(
             log=log,
+            host=host,
             config=config,
             telemetry=telemetry,
-            command_port=command_port,
-            telemetry_port=telemetry_port,
-            host=host,
+            port=port,
         )
-
         self.set_state(initial_state)
 
     @property

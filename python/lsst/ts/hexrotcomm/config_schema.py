@@ -32,6 +32,27 @@ $id: https://github.com/lsst-ts/ts_hexrotcomm/blob/master/python/lsst/ts/hexrotc
 title: MTRotator v1
 description: Configuration for SimpleCsc, which has no configuration.
 type: object
+properties:
+  host:
+    description: >-
+      IP address of the TCP/IP interface.
+      Ignored for SimpleCsc, because it always runs in simulation mode.
+    type: string
+    format: hostname
+    default: "127.0.0.1"
+  port:
+    description: >-
+      Telemetry port number of the TCP/IP interface.
+      The command port is one larger.
+      Ignored for SimpleCsc, because it always runs in simulation mode.
+    type: integer
+    default: 0
+  connection_timeout:
+    description: Time limit for connecting to the TCP/IP interface (sec)
+    type: number
+    exclusiveMinimum: 0
+    default: 10
+required: [host, port, connection_timeout]
 additionalProperties: false
 """
 )
