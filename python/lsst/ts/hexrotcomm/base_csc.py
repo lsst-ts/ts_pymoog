@@ -23,6 +23,7 @@ __all__ = ["BaseCsc"]
 
 import abc
 import asyncio
+import traceback
 import warnings
 
 from lsst.ts import tcpip
@@ -185,6 +186,11 @@ class BaseCsc(salobj.ConfigurableCsc):
         self.TelemetryClass = TelemetryClass
         self.sync_pattern = sync_pattern
         self.mock_ctrl = None
+
+        # Set this False to simulate failing a connection to the low-level
+        # controller, by not starting the mock controller.
+        # Ignored unless in simulation mode.
+        self.allow_mock_controller = True
 
         self.config = None
 
@@ -526,33 +532,59 @@ class BaseCsc(salobj.ConfigurableCsc):
             await self.disconnect()
 
     async def connect(self):
+        """Connect to the low-level controller.
+
+        After starting the mock controller, if using one.
+        """
         await self.disconnect()
-        if self.simulation_mode != 0:
-            self.mock_ctrl = self.make_mock_controller(ControllerState.OFFLINE)
-            await self.mock_ctrl.start_task
-            host = tcpip.LOCAL_HOST
-            telemetry_port = self.mock_ctrl.telemetry_port
-            command_port = self.mock_ctrl.command_port
-        else:
-            host = self.host
-            telemetry_port = self.port
-            command_port = self.port + 1
-        self.client = CommandTelemetryClient(
-            log=self.log,
-            ConfigClass=self.ConfigClass,
-            TelemetryClass=self.TelemetryClass,
-            host=host,
-            command_port=command_port,
-            telemetry_port=telemetry_port,
-            connect_callback=self.connect_callback,
-            config_callback=self.config_callback,
-            telemetry_callback=self.basic_telemetry_callback,
-        )
-        await asyncio.wait_for(
-            self.client.connect_task, timeout=self.config.connection_timeout
-        )
+        try:
+            if self.simulation_mode != 0:
+                host = tcpip.LOCAL_HOST
+                if self.allow_mock_controller:
+                    self.mock_ctrl = self.make_mock_controller(ControllerState.OFFLINE)
+                    await self.mock_ctrl.start_task
+                    telemetry_port = self.mock_ctrl.telemetry_port
+                    command_port = self.mock_ctrl.command_port
+                else:
+                    self.log.warning(
+                        "Not starting the mock controller because allow_mock_controller is False. "
+                        "The CSC should fail to connect to the low-level controller and go to FAULT state."
+                    )
+                    telemetry_port = self.port
+                    command_port = self.port + 1
+            else:
+                host = self.host
+                telemetry_port = self.port
+                command_port = self.port + 1
+            connect_descr = f"host={host}, telemetry_port={telemetry_port}, command_port={command_port}"
+            self.log.info(f"connect to {connect_descr}")
+            self.client = CommandTelemetryClient(
+                log=self.log,
+                ConfigClass=self.ConfigClass,
+                TelemetryClass=self.TelemetryClass,
+                host=host,
+                command_port=command_port,
+                telemetry_port=telemetry_port,
+                connect_callback=self.connect_callback,
+                config_callback=self.config_callback,
+                telemetry_callback=self.basic_telemetry_callback,
+            )
+            await asyncio.wait_for(
+                self.client.connect_task, timeout=self.config.connection_timeout
+            )
+        except Exception:
+            self.fault(
+                code=ErrorCode.CONNECTION_LOST,
+                report=f"Failed to connect to {connect_descr}",
+                traceback=traceback.format_exc(),
+            )
+            raise
 
     async def disconnect(self):
+        """Disconnect from the low-level controller.
+
+        And shut down the mock controller, if using one.
+        """
         if self.connected:
             try:
                 await self.client.close()
