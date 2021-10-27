@@ -122,8 +122,34 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
                 topic=self.remote.evt_errorCode, errorCode=ErrorCode.CONTROLLER_FAULT
             )
 
+    async def test_cannot_connect(self):
+        """Being unable to connect should send CSC to fault state.
+
+        The error code should be ErrorCode.CONNECTION_LOST
+        """
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            simulation_mode=1,
+            config_dir=LOCAL_CONFIG_DIR,
+        ):
+            await self.assert_next_summary_state(salobj.State.STANDBY)
+
+            # Tell the CSC not to make a mock controller,
+            # so it will fail to connect to the low-level controller.
+            self.csc.allow_mock_controller = False
+
+            with salobj.assertRaisesAckError():
+                await self.remote.cmd_start.start(timeout=STD_TIMEOUT)
+            await self.assert_next_summary_state(salobj.State.FAULT)
+            await self.assert_next_sample(
+                topic=self.remote.evt_errorCode, errorCode=ErrorCode.CONNECTION_LOST
+            )
+
     async def test_lose_connection(self):
-        """Losing the connection should send CSC to fault, error code 2"""
+        """Losing the connection should send CSC to fault state.
+
+        The error code should be ErrorCode.CONNECTION_LOST
+        """
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
             simulation_mode=1,

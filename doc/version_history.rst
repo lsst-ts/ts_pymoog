@@ -6,6 +6,23 @@
 Version History
 ###############
 
+v0.23.1
+-------
+
+Changes:
+
+* `BaseCsc`: go to FAULT state if the CSC cannot connect to the low-level controller.
+* Modernize unit tests to use bare assert.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 6.3
+* ts_idl 2.2
+* ts_tcpip 0.1
+* ts_xml 7.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.23.0
 -------
 
