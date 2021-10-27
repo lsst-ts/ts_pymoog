@@ -191,7 +191,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
         timeout : `float`
             Time to wait for connect_callback (seconds).
         """
-        self.assertGreaterEqual(skip, 0)
+        assert skip >= 0
         for n in range(skip + 1):
             next_command, next_telemetry = await asyncio.wait_for(
                 self.connect_queue.get(), timeout=timeout
@@ -208,15 +208,15 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
 
     async def test_initial_conditions(self):
         self.assert_connected(command=True, telemetry=True)
-        self.assertTrue(self.mock_ctrl.connected)
-        self.assertTrue(self.mock_ctrl.command_connected)
-        self.assertTrue(self.mock_ctrl.telemetry_connected)
+        assert self.mock_ctrl.connected
+        assert self.mock_ctrl.command_connected
+        assert self.mock_ctrl.telemetry_connected
         config = await self.next_config()
         assert config.min_position == self.initial_min_position
         assert config.max_position == self.initial_max_position
         telemetry = await self.client.next_telemetry()
         assert telemetry.cmd_position == self.initial_cmd_position
-        self.assertGreaterEqual(telemetry.curr_position, self.initial_cmd_position)
+        telemetry.curr_position >= self.initial_cmd_position
 
         # extra calls to client.connect should fail
         with pytest.raises(RuntimeError):
@@ -324,9 +324,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             "curr_position",
             "cmd_position",
         ):
-            self.assertEqual(
-                getattr(read_telemetry, name), getattr(telemetry, name), msg=name
-            )
+            assert getattr(read_telemetry, name) == getattr(telemetry, name), name
 
     async def test_put_command_errors(self):
         """Test expected failures in CommandTelemetryServer.put_command."""
@@ -359,7 +357,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
         config = await self.next_config()
         assert config.min_position == self.initial_min_position
         assert config.max_position == self.initial_max_position
-        self.assertGreaterEqual(len(self.telemetry_list), 1)
+        assert len(self.telemetry_list) >= 1
         self.assert_connected(command=True, telemetry=True)
 
     async def test_should_be_connected(self):
