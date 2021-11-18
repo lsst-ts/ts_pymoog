@@ -20,6 +20,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
+import contextlib
 import logging
 import unittest
 
@@ -43,15 +44,17 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
     """
 
     async def asyncSetUp(self):
+        self.client = None  # set by make_client
+
         # Queue of (command_connected, telemetry_connected) filled by
         # the self.connect_callback
         self.connect_queue = asyncio.Queue()
 
         # Queue of config filled by the self.config_callback
-        self.config_queue = asyncio.Queue()
+        self.config_list = []
 
         # List of telemetry, filled by the server's telemetry_callback.
-        # This is a list (not a queue like connect_queue and config_queue)
+        # This is a list (not a queue like connect_queue and config_list)
         # because we almost always want the latest value
         self.telemetry_list = []
 
@@ -79,8 +82,6 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
         self.initial_max_velocity = self.mock_ctrl.config.max_velocity
         self.initial_cmd_position = self.mock_ctrl.telemetry.cmd_position
 
-        self.client = await self.make_client()
-
         # List of asyncio stream writers to close in tearDown
         self.writers = []
 
@@ -92,15 +93,14 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
                 await hexrotcomm.close_stream_writer(writer)
             except asyncio.CancelledError:
                 pass
-        if self.client is not None:
-            await self.client.close()
 
+    @contextlib.asynccontextmanager
     async def make_client(self):
         """Make a simple controller and wait for it to connect.
 
         Sets attribute self.mock_ctrl to the controller.
         """
-        client = hexrotcomm.CommandTelemetryClient(
+        self.client = hexrotcomm.CommandTelemetryClient(
             log=self.mock_ctrl.log,
             ConfigClass=hexrotcomm.SimpleConfig,
             TelemetryClass=hexrotcomm.SimpleTelemetry,
@@ -111,16 +111,19 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             config_callback=self.config_callback,
             telemetry_callback=self.telemetry_callback,
         )
-        assert not client.should_be_connected
-        await asyncio.wait_for(client.connect_task, timeout=STD_TIMEOUT)
-        assert client.should_be_connected
+        assert not self.client.should_be_connected
+        await asyncio.wait_for(self.client.connect_task, timeout=STD_TIMEOUT)
+        assert self.client.should_be_connected
         await self.assert_next_connected(command=True, telemetry=True, skip=1)
         print(
             f"client started; "
             f"command_port={self.mock_ctrl.command_port}; "
             f"telemetry_port={self.mock_ctrl.telemetry_port}"
         )
-        return client
+        try:
+            yield
+        finally:
+            await self.client.close()
 
     def connect_callback(self, server):
         self.connect_queue.put_nowait(
@@ -132,7 +135,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             )
 
     def config_callback(self, server):
-        self.config_queue.put_nowait(server.config)
+        self.config_list.append(server.config)
         if self.callbacks_raise:
             raise RuntimeError(
                 "config_callback raising because self.callbacks_raise is true"
@@ -169,10 +172,6 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
         self.writers.append(writer)
         return reader, writer
 
-    async def next_config(self):
-        """Wait for next config."""
-        return await asyncio.wait_for(self.config_queue.get(), timeout=STD_TIMEOUT)
-
     async def assert_next_connected(
         self, command, telemetry, skip=0, timeout=STD_TIMEOUT
     ):
@@ -207,183 +206,196 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
         assert self.client.connected == command and telemetry
 
     async def test_initial_conditions(self):
-        self.assert_connected(command=True, telemetry=True)
-        assert self.mock_ctrl.connected
-        assert self.mock_ctrl.command_connected
-        assert self.mock_ctrl.telemetry_connected
-        config = await self.next_config()
-        assert config.min_position == self.initial_min_position
-        assert config.max_position == self.initial_max_position
-        telemetry = await self.client.next_telemetry()
-        assert telemetry.cmd_position == self.initial_cmd_position
-        telemetry.curr_position >= self.initial_cmd_position
+        async with self.make_client():
+            self.assert_connected(command=True, telemetry=True)
+            assert self.mock_ctrl.connected
+            assert self.mock_ctrl.command_connected
+            assert self.mock_ctrl.telemetry_connected
+            await asyncio.wait_for(self.client.configured_task, timeout=STD_TIMEOUT)
+            config = self.client.config
+            assert config.min_position == self.initial_min_position
+            assert config.max_position == self.initial_max_position
+            telemetry = await self.client.next_telemetry()
+            assert telemetry.cmd_position == self.initial_cmd_position
+            telemetry.curr_position >= self.initial_cmd_position
 
-        # extra calls to client.connect should fail
-        with pytest.raises(RuntimeError):
-            await self.client.connect()
+            # extra calls to client.connect should fail
+            with pytest.raises(RuntimeError):
+                await self.client.connect()
 
     async def test_client_reconnect(self):
         """Test that CommandTelemetryServer allows reconnection."""
-        await self.client.close()
-        await self.assert_next_connected(command=False, telemetry=False)
-        assert not self.mock_ctrl.command_connected
-        assert not self.mock_ctrl.telemetry_connected
+        async with self.make_client():
+            await self.client.close()
+            await self.assert_next_connected(command=False, telemetry=False)
+            assert not self.mock_ctrl.command_connected
+            assert not self.mock_ctrl.telemetry_connected
 
-        client = await self.make_client()
-        try:
+        async with self.make_client():
             assert self.mock_ctrl.connected
-        finally:
-            await client.close()
 
     async def test_move_command(self):
-        config = await self.next_config()
-        assert config.min_position == self.initial_min_position
-        assert config.max_position == self.initial_max_position
-        telemetry = await self.client.next_telemetry()
-        assert telemetry.cmd_position == self.initial_cmd_position
+        async with self.make_client():
+            await asyncio.wait_for(self.client.configured_task, timeout=STD_TIMEOUT)
+            config = self.client.config
+            assert config.min_position == self.initial_min_position
+            assert config.max_position == self.initial_max_position
+            telemetry = await self.client.next_telemetry()
+            assert telemetry.cmd_position == self.initial_cmd_position
 
-        expected_counter = 0
-        for good_position in (
-            self.initial_min_position,
-            self.initial_max_position,
-            (self.initial_min_position + self.initial_max_position) / 2,
-        ):
-            expected_counter += 1
-            with self.subTest(good_position=good_position):
-                await self.check_move(
-                    cmd_position=good_position, expected_counter=expected_counter
-                )
-        last_good_position = good_position
+            expected_counter = 0
+            for good_position in (
+                self.initial_min_position,
+                self.initial_max_position,
+                (self.initial_min_position + self.initial_max_position) / 2,
+            ):
+                expected_counter += 1
+                with self.subTest(good_position=good_position):
+                    await self.check_move(
+                        cmd_position=good_position, expected_counter=expected_counter
+                    )
+            last_good_position = good_position
 
-        for bad_position in (
-            self.initial_min_position - 0.001,
-            self.initial_max_position + 0.001,
-        ):
-            expected_counter += 1
-            with self.subTest(bad_position=bad_position):
-                await self.check_move(
-                    cmd_position=bad_position,
-                    expected_counter=expected_counter,
-                    expected_position=last_good_position,
-                )
+            for bad_position in (
+                self.initial_min_position - 0.001,
+                self.initial_max_position + 0.001,
+            ):
+                expected_counter += 1
+                with self.subTest(bad_position=bad_position):
+                    await self.check_move(
+                        cmd_position=bad_position,
+                        expected_counter=expected_counter,
+                        expected_position=last_good_position,
+                    )
 
-        # set position commands should not trigger configuration output.
-        with pytest.raises(asyncio.TimeoutError):
-            await self.next_config()
+            # set position commands should not trigger configuration output.
+            await asyncio.sleep(1)
+            assert len(self.config_list) == 1
 
     async def test_bad_frame_id(self):
         """Test that sending a header with an unknown frame ID causes
         the server to flush the rest of the message and continue.
         """
-        # Stop the telemetry loop and clear telemetry_list
-        self.mock_ctrl.telemetry_loop_task.cancel()
-        # give the task time to finish; probably not needed
-        await asyncio.sleep(0.01)
-        writer = self.mock_ctrl.telemetry_server.writer
-        self.telemetry_list = []
+        async with self.make_client():
+            # Stop the telemetry loop and clear telemetry_list
+            self.mock_ctrl.telemetry_loop_task.cancel()
+            # give the task time to finish; probably not needed
+            await asyncio.sleep(0.01)
+            writer = self.mock_ctrl.telemetry_server.writer
+            self.telemetry_list = []
 
-        # Fill a telemetry struct with arbitrary data.
-        telemetry = hexrotcomm.SimpleTelemetry(
-            application_status=5,
-            state=1,
-            enabled_substate=2,
-            offline_substate=3,
-            curr_position=6.3,
-            cmd_position=-15.4,
-        )
+            # Fill a telemetry struct with arbitrary data.
+            telemetry = hexrotcomm.SimpleTelemetry(
+                application_status=5,
+                state=1,
+                enabled_substate=2,
+                offline_substate=3,
+                curr_position=6.3,
+                cmd_position=-15.4,
+            )
 
-        # Write a header with invalid frame ID and telemetry data.
-        # The bad header should trigger an error log message
-        # and the data should be flushed.
-        bad_frame_id = (
-            hexrotcomm.SimpleTelemetry().FRAME_ID + hexrotcomm.SimpleConfig().FRAME_ID
-        )
-        bad_header = hexrotcomm.Header()
-        bad_header.frame_id = bad_frame_id
-        with self.assertLogs(level=logging.ERROR):
-            await hexrotcomm.write_from(writer, bad_header)
+            # Write a header with invalid frame ID and telemetry data.
+            # The bad header should trigger an error log message
+            # and the data should be flushed.
+            bad_frame_id = (
+                hexrotcomm.SimpleTelemetry().FRAME_ID
+                + hexrotcomm.SimpleConfig().FRAME_ID
+            )
+            bad_header = hexrotcomm.Header()
+            bad_header.frame_id = bad_frame_id
+            with self.assertLogs(level=logging.ERROR):
+                await hexrotcomm.write_from(writer, bad_header)
+                await hexrotcomm.write_from(writer, telemetry)
+                # Give the reader time to read and deal with the message.
+                await asyncio.sleep(STD_TIMEOUT)
+            assert len(self.telemetry_list) == 0
+
+            # Write a good header and telemetry and test that they are read.
+            good_header = hexrotcomm.Header()
+            good_header.frame_id = telemetry.FRAME_ID
+            await hexrotcomm.write_from(writer, good_header)
             await hexrotcomm.write_from(writer, telemetry)
             # Give the reader time to read and deal with the message.
             await asyncio.sleep(STD_TIMEOUT)
-        assert len(self.telemetry_list) == 0
-
-        # Write a good header and telemetry and test that they are read.
-        good_header = hexrotcomm.Header()
-        good_header.frame_id = telemetry.FRAME_ID
-        await hexrotcomm.write_from(writer, good_header)
-        await hexrotcomm.write_from(writer, telemetry)
-        # Give the reader time to read and deal with the message.
-        await asyncio.sleep(STD_TIMEOUT)
-        assert len(self.telemetry_list) == 1
-        read_telemetry = self.telemetry_list[0]
-        for name in (
-            "application_status",
-            "state",
-            "enabled_substate",
-            "offline_substate",
-            "curr_position",
-            "cmd_position",
-        ):
-            assert getattr(read_telemetry, name) == getattr(telemetry, name), name
+            assert len(self.telemetry_list) == 1
+            read_telemetry = self.telemetry_list[0]
+            for name in (
+                "application_status",
+                "state",
+                "enabled_substate",
+                "offline_substate",
+                "curr_position",
+                "cmd_position",
+            ):
+                assert getattr(read_telemetry, name) == getattr(telemetry, name), name
 
     async def test_put_command_errors(self):
         """Test expected failures in CommandTelemetryServer.put_command."""
-        assert self.client.connected
+        async with self.make_client():
+            assert self.client.connected
 
-        command = hexrotcomm.Command()
-        command.code = hexrotcomm.SimpleCommandCode.MOVE
-        command.param1 = 0
+            command = hexrotcomm.Command()
+            command.code = hexrotcomm.SimpleCommandCode.MOVE
+            command.param1 = 0
 
-        # Should fail if not an instance of Command
-        with pytest.raises(ValueError):
-            await self.client.put_command("not a command")
+            # Should fail if not an instance of Command
+            with pytest.raises(ValueError):
+                await self.client.put_command("not a command")
 
-        # The client should still be connected
-        assert self.client.connected
+            # The client should still be connected
+            assert self.client.connected
 
-        # Should fail if command client is not connected
-        await self.client.close()
-        assert not self.client.connected
-        assert not self.client.telemetry_connected
-        with pytest.raises(RuntimeError):
-            await self.client.put_command(command)
+            # Should fail if command client is not connected
+            await self.client.close()
+            assert not self.client.connected
+            assert not self.client.telemetry_connected
+            with pytest.raises(RuntimeError):
+                await self.client.put_command(command)
 
     async def test_failed_callbacks(self):
         """Check that the server gracefully handles callback functions
         that raise an exception.
         """
         self.callbacks_raise = True
-        await self.client.next_telemetry()
-        config = await self.next_config()
-        assert config.min_position == self.initial_min_position
-        assert config.max_position == self.initial_max_position
-        assert len(self.telemetry_list) >= 1
-        self.assert_connected(command=True, telemetry=True)
+        async with self.make_client():
+            with pytest.raises(RuntimeError):
+                await asyncio.wait_for(self.client.configured_task, timeout=STD_TIMEOUT)
+            config = self.client.config
+            assert config.min_position == self.initial_min_position
+            assert config.max_position == self.initial_max_position
+            assert len(self.config_list) == 1
+            await asyncio.wait_for(self.client.next_telemetry(), timeout=STD_TIMEOUT)
+            assert len(self.telemetry_list) >= 1
+            self.assert_connected(command=True, telemetry=True)
 
     async def test_should_be_connected(self):
-        """Test that should_be_connected remains true for basic_close.
+        """Test the should_be_connected attribute.
 
         Note that make_client already checks that should_be_connected
         is false before making a connection and true after.
         """
-        assert self.client.connected
-        assert self.client.should_be_connected
+        async with self.make_client():
+            assert self.client.connected
+            assert self.client.should_be_connected
 
-        await self.client.basic_close()
-        assert self.client.should_be_connected
-        assert not self.client.connected
-        await self.assert_next_connected(command=False, telemetry=False)
+            # should_be_connected should still be true after basic_close
+            await self.client.basic_close()
+            assert self.client.should_be_connected
+            assert not self.client.connected
+            await self.assert_next_connected(command=False, telemetry=False)
 
-        await self.client.close()
-        assert not self.client.connected
-        assert not self.client.should_be_connected
+            # should_be_connected should be false after close
+            await self.client.close()
+            assert not self.client.connected
+            assert not self.client.should_be_connected
 
-        # should_be_connected should still be true if the connection is lost
-        client = await self.make_client()
-        await self.mock_ctrl.close_client()
-        assert not client.connected
-        assert client.should_be_connected
-        await self.assert_next_connected(command=False, telemetry=False)
+        # should_be_connected should still be true
+        # if the connection is lost
+        async with self.make_client():
+            await self.mock_ctrl.close_client()
+            assert not self.client.connected
+            assert self.client.should_be_connected
+            await self.assert_next_connected(command=False, telemetry=False)
 
     async def check_move(self, cmd_position, expected_counter, expected_position=None):
         """Command a position and check the result.
