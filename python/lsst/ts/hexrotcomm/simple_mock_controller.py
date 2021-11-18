@@ -42,6 +42,10 @@ SIMPLE_SYNC_PATTERN = 0x1234
 # for the MT camera rotator and two MT hexapods.
 SIMPLE_TELEMETRY_PORT = 6210
 
+# Set False to disable output of configuration.
+# Use this to test no config at connect time.
+ENABLE_CONFIG = True
+
 
 class SimpleCommandCode(enum.IntEnum):
     SET_STATE = 1
@@ -165,3 +169,9 @@ class SimpleMockController(base_mock_controller.BaseMockController):
 
     async def end_run_command(self, **kwargs):
         pass
+
+    async def write_config(self):
+        if ENABLE_CONFIG:
+            await super().write_config()
+        else:
+            self.log.warning("Not writing config because ENABLE_CONFIG false")
