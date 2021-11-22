@@ -37,6 +37,31 @@ from .command_telemetry_client import CommandTelemetryClient
 # a commanded state change failed.
 MAX_STATE_CHANGE_TELEMETRY_MESSAGES = 5
 
+# Timeout (seconds) for the first config message to arrive,
+# after connecting to the low-level controller.
+CONFIG_TIMEOUT = 10
+
+
+def make_connect_error_info(prefix, connected, connect_descr):
+    """Make an error code and error message for a connect error.
+
+    Parameters
+    ----------
+    prefix : `str`
+        Prefix for error message.
+    connected : `bool`
+        Was the connection safely made?
+    connect_descr : `str`
+        A brief description of the host and port.
+    """
+    if connected:
+        error_code = ErrorCode.NO_CONFIG
+        err_msg = f"Timed out waiting for config from {connect_descr}"
+    else:
+        error_code = ErrorCode.CONNECTION_LOST
+        err_msg = f"Timed out connecting to {connect_descr}"
+    return error_code, err_msg
+
 
 def make_state_transition_dict():
     """Make a dict of state transition commands and states
@@ -107,17 +132,8 @@ class BaseCsc(salobj.ConfigurableCsc):
         Configuration structure.
     TelemetryClass : `ctypes.Structure`
         Telemetry structure.
-    schema_path : `str`, `pathlib.Path` or `None`, optional
-        Path to a schema file used to validate configuration files.
-        This is deprecated; new code should specify ``config_schema`` instead.
-        The recommended path is ``<package_root>/"schema"/f"{name}.yaml"``
-        for example:
-
-            schema_path = pathlib.Path(__file__).resolve().parents[4] \
-                / "schema" / f"{name}.yaml"
     config_schema : `dict` or None, optional
         Configuration schema, as a dict in jsonschema format.
-        Exactly one of ``schema_path`` or ``config_schema`` must not be None.
     config_dir : `str`, optional
         Directory of configuration files, or None for the standard
         configuration directory (obtained from `_get_default_config_dir`).
@@ -171,7 +187,6 @@ class BaseCsc(salobj.ConfigurableCsc):
         CommandCode,
         ConfigClass,
         TelemetryClass,
-        schema_path=None,
         config_schema=None,
         config_dir=None,
         initial_state=salobj.State.STANDBY,
@@ -212,7 +227,6 @@ class BaseCsc(salobj.ConfigurableCsc):
         super().__init__(
             name=name,
             index=index,
-            schema_path=schema_path,
             config_dir=config_dir,
             config_schema=config_schema,
             initial_state=initial_state,
@@ -537,6 +551,9 @@ class BaseCsc(salobj.ConfigurableCsc):
         After starting the mock controller, if using one.
         """
         await self.disconnect()
+        # Use a local variable to avoid any possibility of
+        # the wrong error message due to a race condition.
+        connected = False
         try:
             if self.simulation_mode != 0:
                 host = tcpip.LOCAL_HOST
@@ -572,11 +589,26 @@ class BaseCsc(salobj.ConfigurableCsc):
             await asyncio.wait_for(
                 self.client.connect_task, timeout=self.config.connection_timeout
             )
+            connected = True
+            await asyncio.wait_for(self.client.configured_task, timeout=CONFIG_TIMEOUT)
+        except asyncio.TimeoutError:
+            error_code, err_msg = make_connect_error_info(
+                prefix="Timed out", connected=connected, connect_descr=connect_descr
+            )
+            self.fault(code=error_code, report=err_msg)
+            raise salobj.ExpectedError(err_msg)
+        except ConnectionRefusedError:
+            err_msg = f"Connection refused by {connect_descr}"
+            self.fault(code=ErrorCode.CONNECTION_LOST, report=err_msg)
+            raise salobj.ExpectedError(err_msg)
         except Exception:
+            error_code, err_msg = make_connect_error_info(
+                prefix="Unexpected error",
+                connected=connected,
+                connect_descr=connect_descr,
+            )
             self.fault(
-                code=ErrorCode.CONNECTION_LOST,
-                report=f"Failed to connect to {connect_descr}",
-                traceback=traceback.format_exc(),
+                code=error_code, report=err_msg, traceback=traceback.format_exc()
             )
             raise
 

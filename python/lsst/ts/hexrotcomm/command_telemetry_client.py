@@ -73,6 +73,9 @@ class CommandTelemetryClient:
     config : ``ConfigClass``
         The most recently read configuration.
         A null-constructed instance before configuration is read.
+    configured_task : `asyncio.Future`
+        A Future that is set to None when configuration is first read and
+        processed, or to the exception if ``config_callback`` raises.
     telemetry : ``TelemetryClass``
         The most recently read telemetry.
         A null-constructed instance before telemetry is read.
@@ -168,9 +171,12 @@ class CommandTelemetryClient:
         # by the data type of Command.counter.
         self._command_counts = dict()
 
-        # Task the user can set to an asyncio.Future()
-        # in order to detect when the next telemetry is read.
-        # Only intended for unit tests.
+        # Task set to None when config is first seen and handled by
+        # config_callback, or the exception if config_callback raises.
+        self.configured_task = asyncio.Future()
+
+        # Task used by next_telemetry to detect when the next telemetry
+        # is read.
         self._telemetry_task = asyncio.Future()
 
         self._read_telemetry_and_config_task = utils.make_done_future()
@@ -216,6 +222,7 @@ class CommandTelemetryClient:
         self.connect_task.cancel()
         self._monitor_command_reader_task.cancel()
         self._read_telemetry_and_config_task.cancel()
+        self.configured_task.cancel()
         self._telemetry_task.cancel()
         if self.command_connected:
             try:
@@ -352,8 +359,12 @@ class CommandTelemetryClient:
                     await tcpip.read_into(self.telemetry_reader, self.config)
                     try:
                         self.config_callback(self)
-                    except Exception:
+                        if not self.configured_task.done():
+                            self.configured_task.set_result(None)
+                    except Exception as e:
                         self.log.exception("config_callback failed.")
+                        if not self.configured_task.done():
+                            self.configured_task.set_exception(e)
                 elif self.header.frame_id == self.telemetry.FRAME_ID:
                     await tcpip.read_into(self.telemetry_reader, self.telemetry)
                     if not self._telemetry_task.done():
@@ -381,7 +392,8 @@ class CommandTelemetryClient:
 
     async def next_telemetry(self):
         """Wait for next telemetry."""
-        self._telemetry_task = asyncio.Future()
+        if self._telemetry_task.done():
+            self._telemetry_task = asyncio.Future()
         await self._telemetry_task
         return self.telemetry
 
