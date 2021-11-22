@@ -24,7 +24,6 @@ Requires:
 * ts_salobj 6.3
 * ts_idl 3.6
 * ts_tcpip 0.1
-* ts_rotator_controller 1.3.2 and ts_hexapod_controller 1.2.2.
 * ts_xml 7.2
 * MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
 
