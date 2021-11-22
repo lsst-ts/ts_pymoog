@@ -21,6 +21,7 @@
 import asyncio
 import pathlib
 import unittest
+import unittest.mock
 
 import pytest
 
@@ -144,6 +145,31 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             await self.assert_next_sample(
                 topic=self.remote.evt_errorCode, errorCode=ErrorCode.CONNECTION_LOST
             )
+
+    async def test_no_config(self):
+        short_config_timeout = 1
+        with unittest.mock.patch(
+            "lsst.ts.hexrotcomm.base_csc.CONFIG_TIMEOUT", short_config_timeout
+        ), unittest.mock.patch(
+            "lsst.ts.hexrotcomm.simple_mock_controller.ENABLE_CONFIG", False
+        ):
+            async with self.make_csc(
+                initial_state=salobj.State.STANDBY,
+                simulation_mode=1,
+                config_dir=LOCAL_CONFIG_DIR,
+            ):
+                await self.assert_next_summary_state(salobj.State.STANDBY)
+                with salobj.assertRaisesAckError(ack=salobj.SalRetCode.CMD_FAILED):
+                    await self.remote.cmd_start.start(
+                        timeout=STD_TIMEOUT + short_config_timeout
+                    )
+                await self.assert_next_summary_state(salobj.State.FAULT)
+                data = await self.assert_next_sample(
+                    topic=self.remote.evt_errorCode,
+                    errorCode=ErrorCode.NO_CONFIG,
+                    traceback="",
+                )
+                assert "Timed out" in data.errorReport
 
     async def test_lose_connection(self):
         """Losing the connection should send CSC to fault state.

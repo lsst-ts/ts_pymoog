@@ -6,6 +6,28 @@
 Version History
 ###############
 
+v0.24.0
+-------
+
+Changes:
+
+* `BaseCsc`:
+
+    * Go to FAULT state and report error code NO_CONFIG if the low-level controller does not report config shortly after connecting.
+      This requires ts_idl 3.6.
+    * Remove the deprecated ``schema_path`` constructor argument.
+      It and was not being used.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 6.3
+* ts_idl 3.6
+* ts_tcpip 0.1
+* ts_rotator_controller 1.3.2 and ts_hexapod_controller 1.2.2.
+* ts_xml 7.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.23.1
 -------
 
