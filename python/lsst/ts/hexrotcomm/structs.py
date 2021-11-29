@@ -19,15 +19,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["Command", "Header"]
+__all__ = ["Command", "CommandStatus", "Header"]
 
 import ctypes
 
+# Called ``LENGTH_CMD_STATUS_REASON`` in the Moog controller code.
+COMMAND_STATUS_REASON_LEN = 50
+
 
 class Command(ctypes.Structure):
-    """Command for Moog controller.
+    """Command for a Moog controller.
 
-    Called ``commandStreamStructure_t`` in the Moog code.
+    Called ``commandStreamStructure_t`` in the Moog controller.
     """
 
     _pack_ = 1
@@ -44,10 +47,25 @@ class Command(ctypes.Structure):
     ]
 
 
+class CommandStatus(ctypes.Structure):
+    """Command status from a Moog controller.
+
+    Called ``commandStatusStructure_t`` in the Moog controller.
+    """
+
+    _pack_ = 1
+    _fields_ = [
+        ("status", ctypes.c_uint),  # called cmdStatus in the Moog controller.
+        ("duration", ctypes.c_double),
+        ("reason", ctypes.c_char * COMMAND_STATUS_REASON_LEN),
+    ]
+    FRAME_ID = 0x1
+
+
 class Header(ctypes.Structure):
     """Initial part of telemetry or configuration data from a Moog controller.
 
-    Called ``telemetryHeaderStructure_t`` in the Moog code.
+    Called ``telemetryHeaderStructure_t`` in the Moog controller.
     """
 
     _pack_ = 1

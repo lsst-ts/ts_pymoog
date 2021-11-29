@@ -29,7 +29,7 @@ from lsst.ts.idl.enums.MTRotator import (
     EnabledSubstate,
 )
 from . import enums
-from .command_telemetry_server import CommandTelemetryServer
+from .command_telemetry_server import CommandTelemetryServer, CommandError
 
 
 class BaseMockController(CommandTelemetryServer, abc.ABC):
@@ -47,6 +47,8 @@ class BaseMockController(CommandTelemetryServer, abc.ABC):
         `get_command_key`): method to call for that command.
         Note: BaseMockController already supports the standard state
         transition commands, including CLEAR_ERROR.
+        If the command is not done when the method returns,
+        the method should return the predicted duration, in seconds.
     CommandCode : `enum`
         Command codes.
     config : `ctypes.Structure`
@@ -226,17 +228,13 @@ class BaseMockController(CommandTelemetryServer, abc.ABC):
         key = self.get_command_key(command)
         cmd_method = self.command_table.get(key, None)
         if cmd_method is None:
-            self.log.error(
+            raise CommandError(
                 f"Unrecognized command code {command.code}; param1={command.param1}..."
             )
             return
-        try:
-            await cmd_method(command)
-        except Exception as e:
-            self.log.error(
-                f"Command code {command.code}; param1={command.param1}... failed: {e}"
-            )
+        duration = await cmd_method(command)
         await self.end_run_command(command=command, cmd_method=cmd_method)
+        return duration
 
     @abc.abstractmethod
     async def end_run_command(self, command, cmd_method):
