@@ -32,7 +32,8 @@ import enum
 
 from lsst.ts import tcpip
 from lsst.ts.idl.enums.MTRotator import ControllerState, ApplicationStatus
-from . import base_mock_controller
+from .base_mock_controller import BaseMockController
+from .command_telemetry_server import CommandError
 
 
 SIMPLE_SYNC_PATTERN = 0x1234
@@ -80,7 +81,7 @@ class SimpleTelemetry(ctypes.Structure):
     FRAME_ID = 0x5
 
 
-class SimpleMockController(base_mock_controller.BaseMockController):
+class SimpleMockController(BaseMockController):
     """Simple mock controller for unit testing BaseMockController.
 
     The MOVE command sets cmd_position and curr_position,
@@ -141,28 +142,16 @@ class SimpleMockController(base_mock_controller.BaseMockController):
         )
         self.telemetry.application_status = ApplicationStatus.DDS_COMMAND_SOURCE
 
-    async def do_config_velocity(self, command):
-        self.assert_state(ControllerState.ENABLED)
-        max_velocity = command.param1
-        if max_velocity > 0:
-            self.config.max_velocity = max_velocity
-            await self.write_config()
-        else:
-            self.log.error(
-                f"Commanded max velocity {max_velocity} <= 0; ignoring the command."
-            )
-
     async def do_position_set(self, command):
         self.assert_state(ControllerState.ENABLED)
         position = command.param1
-        if self.config.min_position <= position <= self.config.max_position:
-            self.telemetry.cmd_position = position
-            self.telemetry.curr_position = position
-        else:
-            self.log.error(
-                f"Commanded position {position} out of range "
-                f"[{self.config.min_position}, {self.config.max_position}]; ignoring the command."
+        if position < self.config.min_position or position > self.config.max_position:
+            raise CommandError(
+                f"Position {position} out of range "
+                f"[{self.config.min_position}, {self.config.max_position}]."
             )
+        self.telemetry.cmd_position = position
+        self.telemetry.curr_position = position
 
     async def update_telemetry(self, curr_tai):
         self.telemetry.curr_position += 0.001

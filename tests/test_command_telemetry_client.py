@@ -27,6 +27,7 @@ import unittest
 import pytest
 
 from lsst.ts import tcpip
+from lsst.ts import salobj
 from lsst.ts.idl.enums.MTRotator import ControllerState
 from lsst.ts import hexrotcomm
 
@@ -243,7 +244,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             telemetry = await self.client.next_telemetry()
             assert telemetry.cmd_position == self.initial_cmd_position
 
-            expected_counter = 0
+            expected_counter = -1
             for good_position in (
                 self.initial_min_position,
                 self.initial_max_position,
@@ -266,6 +267,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
                         cmd_position=bad_position,
                         expected_counter=expected_counter,
                         expected_position=last_good_position,
+                        should_fail=True,
                     )
 
             # set position commands should not trigger configuration output.
@@ -329,8 +331,8 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             ):
                 assert getattr(read_telemetry, name) == getattr(telemetry, name), name
 
-    async def test_put_command_errors(self):
-        """Test expected failures in CommandTelemetryServer.put_command."""
+    async def test_run_command_errors(self):
+        """Test expected failures in CommandTelemetryServer.run_command."""
         async with self.make_client():
             assert self.client.connected
 
@@ -340,7 +342,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
 
             # Should fail if not an instance of Command
             with pytest.raises(ValueError):
-                await self.client.put_command("not a command")
+                await self.client.run_command("not a command")
 
             # The client should still be connected
             assert self.client.connected
@@ -350,7 +352,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             assert not self.client.connected
             assert not self.client.telemetry_connected
             with pytest.raises(RuntimeError):
-                await self.client.put_command(command)
+                await self.client.run_command(command)
 
     async def test_failed_callbacks(self):
         """Check that the server gracefully handles callback functions
@@ -397,7 +399,47 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             assert self.client.should_be_connected
             await self.assert_next_connected(command=False, telemetry=False)
 
-    async def check_move(self, cmd_position, expected_counter, expected_position=None):
+    async def test_truncate_command_status_reason(self):
+        """Test that a too-long command status reason is truncated."""
+        reader, writer = await asyncio.wait_for(
+            asyncio.open_connection(
+                host=tcpip.LOCAL_HOST, port=self.mock_ctrl.command_port
+            ),
+            timeout=STD_TIMEOUT,
+        )
+        try:
+            header = hexrotcomm.Header()
+            reason_len = hexrotcomm.CommandStatus.reason.size
+            assert reason_len > 0
+            command_status = hexrotcomm.CommandStatus()
+            counter = 45
+            status = hexrotcomm.CommandStatusCode.ACK
+            duration = 3.14
+            too_long_reason = "ab" * reason_len
+            too_long_reason_bytes = too_long_reason.encode()
+            await self.mock_ctrl.write_command_status(
+                counter=counter,
+                status=status,
+                duration=duration,
+                reason=too_long_reason,
+            )
+            await asyncio.wait_for(tcpip.read_into(reader, header), timeout=STD_TIMEOUT)
+            await asyncio.wait_for(
+                tcpip.read_into(reader, command_status), timeout=STD_TIMEOUT
+            )
+            assert header.counter == counter
+            assert command_status.status == status
+            assert command_status.duration == duration
+            assert len(command_status.reason) < len(too_long_reason_bytes)
+            assert command_status.reason == too_long_reason_bytes[0:reason_len]
+        finally:
+            await asyncio.wait_for(
+                tcpip.close_stream_writer(writer), timeout=STD_TIMEOUT
+            )
+
+    async def check_move(
+        self, cmd_position, expected_counter, expected_position=None, should_fail=False
+    ):
         """Command a position and check the result.
 
         If the commanded position is in bounds then the telemetry
@@ -418,7 +460,11 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
         command = hexrotcomm.Command()
         command.code = hexrotcomm.SimpleCommandCode.MOVE
         command.param1 = cmd_position
-        await self.client.put_command(command)
+        if should_fail:
+            with pytest.raises(salobj.ExpectedError):
+                await self.client.run_command(command)
+        else:
+            await self.client.run_command(command)
         assert command.counter == expected_counter
 
         telemetry = await self.client.next_telemetry()
