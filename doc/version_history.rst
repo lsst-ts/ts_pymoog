@@ -6,6 +6,27 @@
 Version History
 ###############
 
+v0.25.0
+-------
+
+Changes:
+
+* `CommandTelemetryClient` and `CommandTelemetryServer`: support command acknowledgement:
+
+    * Change ``CommandTelemetryClient.put_command`` to `CommandTelemetryClient.run_command`.
+    * Add `CommandStatusCode` enum, `CommandStatus` struct, and `CommandError` exception.
+
+* `BaseCsc`: update for command acknowledgement.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 6.3
+* ts_idl 3.6
+* ts_tcpip 0.1
+* ts_xml 7.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.24.0
 -------
 

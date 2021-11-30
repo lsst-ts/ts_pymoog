@@ -19,16 +19,26 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["SetStateParam"]
+__all__ = ["CommandStatusCode", "SetStateParam"]
 
 import enum
+
+
+class CommandStatusCode(enum.IntEnum):
+    """Possible values for CommandStatus.status.
+
+    Called ``CmdStatus`` in the Moog controller.
+    """
+
+    ACK = 1
+    NO_ACK = 2
 
 
 class SetStateParam(enum.IntEnum):
     """Values for ``Command.param1`` when
     ``Command.code = CommandCode.SET_STATE``.
 
-    Called ``TriggerCmds`` in Moog code.
+    Called ``TriggerCmds`` in the Moog controller.
     """
 
     INVALID = 0

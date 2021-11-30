@@ -24,8 +24,13 @@ import asyncio
 import ctypes
 
 from lsst.ts import utils
+from lsst.ts import salobj
 from lsst.ts import tcpip
 from . import structs
+from .enums import CommandStatusCode
+
+# Time limit waiting for a command status (second).
+COMMAND_STATUS_TIMEOUT = 5
 
 
 class CommandTelemetryClient:
@@ -156,6 +161,9 @@ class CommandTelemetryClient:
         self.config_callback = config_callback
         self.telemetry_callback = telemetry_callback
         self.connect_timeout = connect_timeout
+        # Resource lock for writing a command to the command stream
+        # and waiting for acknowledgement.
+        self._command_lock = asyncio.Lock()
         self.command_reader = None
         self.command_writer = None  # not written
         self.telemetry_reader = None  # not read
@@ -166,10 +174,13 @@ class CommandTelemetryClient:
         # the last time connect_callback was called.
         self._was_connected = (False, False)
 
-        # Dict of command_code: number of times this command has been sent;
-        # note that the count will wrap around at some point determined
-        # by the data type of Command.counter.
-        self._command_counts = dict()
+        # Hold on to the last command, in order to increment the command
+        # counter with correct wraparound.
+        # An index generator would also work, but this avoids duplicating
+        # information about the type of the command counter field.
+        # Start from -1 so that the first command has counter=0.
+        self._last_command = structs.Command()
+        self._last_command.counter -= 1
 
         # Task set to None when config is first seen and handled by
         # config_callback, or the exception if config_callback raises.
@@ -179,8 +190,10 @@ class CommandTelemetryClient:
         # is read.
         self._telemetry_task = asyncio.Future()
 
+        # Task used to wait for a command acknowledgement
+        self._read_command_status_task = utils.make_done_future()
+
         self._read_telemetry_and_config_task = utils.make_done_future()
-        self._monitor_command_reader_task = utils.make_done_future()
         self.connect_task = asyncio.create_task(self.connect())
 
     @property
@@ -219,8 +232,8 @@ class CommandTelemetryClient:
 
         Always safe to call.
         """
+        self._read_command_status_task.cancel()
         self.connect_task.cancel()
-        self._monitor_command_reader_task.cancel()
         self._read_telemetry_and_config_task.cancel()
         self.configured_task.cancel()
         self._telemetry_task.cancel()
@@ -261,7 +274,7 @@ class CommandTelemetryClient:
             raise
 
     async def connect_command(self):
-        """Connect to the command socket and start monitor_command_reader loop.
+        """Connect to the command socket.
 
         Unlike high-level method `connect` this waits forever for a connection
         and does not call self.basic_close on error.
@@ -274,10 +287,7 @@ class CommandTelemetryClient:
         self.command_reader, self.command_writer = await asyncio.open_connection(
             host=self.host, port=self.command_port
         )
-        self.log.debug("Command socket connected; starting command monitor")
-        self._monitor_command_reader_task = asyncio.create_task(
-            self.monitor_command_reader()
-        )
+        self.log.debug("Command socket connected")
         self.call_connect_callback()
 
     async def connect_telemetry(self):
@@ -316,34 +326,6 @@ class CommandTelemetryClient:
             self.log.debug(
                 "call_connect_callback not calling connect_callback; no change"
             )
-
-    async def monitor_command_reader(self):
-        """Monitor the command reader; if it closes then close the writer."""
-        # We do not expect to read any data, but we may as well accept it
-        # if some comes in.
-        try:
-            while self.command_connected:
-                await self.command_reader.read(1000)
-                if not self.command_connected:
-                    self.log.debug(
-                        "monitor_command_reader: reader disconnected; closing client sockets"
-                    )
-                    await self.basic_close()
-                    return
-                if self.command_reader.at_eof():
-                    self.log.info("Command reader at eof; closing client sockets")
-                    return
-                else:
-                    self.log.warning("Unexpected data read from the command socket.")
-                    await asyncio.sleep(0.01)
-        except asyncio.CancelledError:
-            self.log.debug("monitor_command_reader cancelled")
-        except ConnectionError:
-            self.log.info("Command reader disconnected; closing client")
-            await self.basic_close()
-        except Exception:
-            self.log.exception("monitor_command_reader failed; closing")
-            await self.basic_close()
 
     async def read_telemetry_and_config(self):
         """Read telemetry and configuration from the Moog controller."""
@@ -397,13 +379,21 @@ class CommandTelemetryClient:
         await self._telemetry_task
         return self.telemetry
 
-    async def put_command(self, command):
-        """Write a command to the controller.
+    async def run_command(self, command, interrupt=False):
+        """Run a command and wait for acknowledgement.
 
         Parameters
         ----------
         command : `Command`
             Command to write. Its counter field will be set.
+        interrupt : `bool`, optional
+            Interrupt the current command, if any?
+            Only use this for the stop command and similar.
+
+        Returns
+        -------
+        duration : `float`
+            The expected duration of the command (seconds).
 
         Raises
         ------
@@ -411,6 +401,15 @@ class CommandTelemetryClient:
             If the command stream is not connected
         ValueError
             If ``command`` is not an instance of `structs.Command`.
+        asyncio.TimeoutError
+            If no acknowledgement is seen in time.
+        lsst.ts.salobj.ExpectedError
+            If the command fails.
+
+        Notes
+        -----
+        Holds the command lock until the reply for this command is seen
+        (or the time limit is exceeded).
         """
         if not self.command_connected:
             raise RuntimeError("Command socket not connected")
@@ -419,9 +418,83 @@ class CommandTelemetryClient:
                 f"command={command!r} must be an instance of structs.Command"
             )
 
-        # Set command.counter to the next value (starting from 1).
-        # Note: this code allows command.counter to wrap around,
-        # without having to know the data type of that field.
-        command.counter = self._command_counts.get(command.code, 0) + 1
-        self._command_counts[command.code] = command.counter
-        await tcpip.write_from(self.command_writer, command)
+        async with self._command_lock:
+            # Cancel the task just to be sure; it's hard to see how it
+            # could be running at this point.
+            self._read_command_status_task.cancel()
+
+            command.counter = self._last_command.counter + 1
+            self._last_command = command
+            await tcpip.write_from(self.command_writer, command)
+
+            self._read_command_status_task = asyncio.create_task(
+                asyncio.wait_for(
+                    self.read_command_status(command.counter),
+                    timeout=COMMAND_STATUS_TIMEOUT,
+                )
+            )
+            return await self._read_command_status_task
+
+    async def read_command_status(self, counter):
+        """Wait for a command status message whose counter matches
+        a specified value.
+
+        Returns
+        -------
+        duration : `float`
+            If the command succeeds.
+
+        Raises
+        ------
+        salobj.ExpectedError
+            If the command failed, the command status code is not recognized,
+            or the command stream disconnects.
+        """
+        header = structs.Header()
+        command_status = structs.CommandStatus()
+        try:
+            while True:
+                if not self.command_connected:
+                    raise salobj.ExpectedError(
+                        "Command socket disconnected while running the command"
+                    )
+
+                await tcpip.read_into(self.command_reader, header)
+                if header.frame_id != structs.CommandStatus.FRAME_ID:
+                    self.log.warning(
+                        f"Ignoring message with unexpected frame_id: "
+                        f"{header.frame_id} != {structs.CommandStatus.FRAME_ID}"
+                    )
+                    continue
+
+                if not self.command_connected:
+                    raise salobj.ExpectedError(
+                        "Command socket disconnected while running the command"
+                    )
+                await tcpip.read_into(self.command_reader, command_status)
+
+                if header.counter != counter:
+                    self.log.warning(
+                        "Ignoring command status for wrong command; "
+                        f"status.counter={header.counter} "
+                        f"!= expected value {counter}"
+                    )
+                    continue
+                break
+        except ConnectionError:
+            self.log.warning("Command stream disconnected; closing client")
+            await self.basic_close()
+            raise salobj.ExpectedError(
+                "Command socket disconnected while running the command"
+            )
+
+        if command_status.status == CommandStatusCode.ACK:
+            return command_status.duration
+        elif command_status.status == CommandStatusCode.NO_ACK:
+            reason = command_status.reason.decode()
+            raise salobj.ExpectedError(reason)
+        else:
+            raise salobj.ExpectedError(
+                f"Unknown command status {command_status.status}; "
+                "low-level command assumed to have failed"
+            )

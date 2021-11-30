@@ -427,7 +427,7 @@ class BaseCsc(salobj.ConfigurableCsc):
         -------
         command : `Command`
             The command. Note that the ``counter`` field is 0;
-            it is set by `CommandTelemetryClient.put_command`.
+            it is set by `CommandTelemetryClient.run_command`.
         """
         command = structs.Command()
         command.code = self.CommandCode(code)
@@ -504,7 +504,7 @@ class BaseCsc(salobj.ConfigurableCsc):
             Command to run, as constructed by `make_command`.
         """
         async with self.write_lock:
-            await self.client.put_command(command)
+            await self.client.run_command(command)
 
     async def do_clearError(self, data):
         raise salobj.ExpectedError(

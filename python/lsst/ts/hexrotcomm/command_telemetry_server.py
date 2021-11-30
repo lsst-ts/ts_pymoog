@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["CommandTelemetryServer"]
+__all__ = ["CommandError", "CommandTelemetryServer"]
 
 import abc
 import asyncio
@@ -28,6 +28,13 @@ import math
 from lsst.ts import utils
 from lsst.ts import tcpip
 from . import structs
+from .enums import CommandStatusCode
+
+
+class CommandError(Exception):
+    """Low-level command failed."""
+
+    pass
 
 
 class CommandTelemetryServer(abc.ABC):
@@ -124,12 +131,17 @@ class CommandTelemetryServer(abc.ABC):
         self.header = structs.Header()
         self.config = config
         self.telemetry = telemetry
+        command_status = structs.CommandStatus()
         # A dictionary of frame ID: header for telemetry and config data
         # Keeping separate headers for telemetry and config allows
         # updating just the relevant fields, rather than creating a new
         # header insteance for each telemetry and config message.
         self.headers = dict()
-        for frame_id in (self.config.FRAME_ID, self.telemetry.FRAME_ID):
+        for frame_id in (
+            self.config.FRAME_ID,
+            self.telemetry.FRAME_ID,
+            command_status.FRAME_ID,
+        ):
             header = structs.Header()
             header.frame_id = frame_id
             self.headers[frame_id] = header
@@ -239,7 +251,30 @@ class CommandTelemetryServer(abc.ABC):
             try:
                 command = structs.Command()
                 await tcpip.read_into(self.command_server.reader, command)
-                await self.run_command(command)
+                try:
+                    duration = await self.run_command(command)
+                except CommandError as e:
+                    await self.write_command_status(
+                        counter=command.counter,
+                        status=CommandStatusCode.NO_ACK,
+                        reason=e.args[0],
+                    )
+                except Exception as e:
+                    self.log.exception("Command failed (without raising CommandError)")
+                    await self.write_command_status(
+                        counter=command.counter,
+                        status=CommandStatusCode.NO_ACK,
+                        reason=str(e),
+                    )
+                else:
+                    if duration is None:
+                        duration = 0
+                    await self.write_command_status(
+                        counter=command.counter,
+                        status=CommandStatusCode.ACK,
+                        duration=duration,
+                    )
+
             except asyncio.CancelledError:
                 raise
             except ConnectionError:
@@ -329,6 +364,35 @@ class CommandTelemetryServer(abc.ABC):
         header, curr_tai = self.update_and_get_header(self.config.FRAME_ID)
         await tcpip.write_from(self.telemetry_server.writer, header, self.config)
 
+    async def write_command_status(self, counter, status, duration=0, reason=""):
+        """Write a command status.
+
+        Note that this is written to the command socket.
+
+        Parameters
+        ----------
+        counter : `int`
+            counter field of command being acknowledged.
+        status : `CommandStatusCode`
+            Command status code.
+        duration : `float` or `None`, optional
+            Estimated duration. None is treated as 0.
+        reason : `str`, optional
+            Reason for failure. Should be non-blank if and only if the
+            command failed.
+        """
+        if duration is None:
+            duration = 0
+        header, curr_tai = self.update_and_get_header(structs.CommandStatus.FRAME_ID)
+        header.counter = counter
+        command_status = structs.CommandStatus(
+            status=status,
+            duration=duration,
+            reason=reason.encode()[0 : structs.COMMAND_STATUS_REASON_LEN],
+        )
+        assert self.command_server.writer is not None
+        await tcpip.write_from(self.command_server.writer, header, command_status)
+
     async def close_client(self):
         """Close the client sockets."""
         if self._basic_close_client_task.done():
@@ -376,5 +440,18 @@ class CommandTelemetryServer(abc.ABC):
         ----------
         command : `Command`
             Command to run.
+
+        Returns
+        -------
+        duration : `float` or `None`
+            Expected duration (seconds);
+            0 or None if command is done.
+
+        Raises
+        ------
+        CommandError
+            If the command fails for some anticipated reason,
+            such as the low-level controller being in the wrong state,
+            or a parameter being out of range.
         """
         raise NotImplementedError()
