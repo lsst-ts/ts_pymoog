@@ -112,6 +112,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
                 enabledSubstate=EnabledSubstate.STATIONARY,
             )
             await self.assert_next_summary_state(salobj.State.ENABLED)
+            await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
 
             self.csc.mock_ctrl.set_state(ControllerState.FAULT)
             await self.assert_next_sample(
@@ -134,6 +135,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             config_dir=LOCAL_CONFIG_DIR,
         ):
             await self.assert_next_summary_state(salobj.State.STANDBY)
+            await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
 
             # Tell the CSC not to make a mock controller,
             # so it will fail to connect to the low-level controller.
@@ -159,6 +161,10 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
                 config_dir=LOCAL_CONFIG_DIR,
             ):
                 await self.assert_next_summary_state(salobj.State.STANDBY)
+                await self.assert_next_sample(
+                    topic=self.remote.evt_errorCode, errorCode=0
+                )
+
                 with salobj.assertRaisesAckError(ack=salobj.SalRetCode.CMD_FAILED):
                     await self.remote.cmd_start.start(
                         timeout=STD_TIMEOUT + short_config_timeout
@@ -188,6 +194,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
                 enabledSubstate=EnabledSubstate.STATIONARY,
             )
             await self.assert_next_summary_state(salobj.State.ENABLED)
+            await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
 
             assert self.csc.client.should_be_connected
             await self.csc.mock_ctrl.close_client()
@@ -195,6 +202,10 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             await self.assert_next_sample(
                 topic=self.remote.evt_errorCode, errorCode=ErrorCode.CONNECTION_LOST
             )
+
+            # Test recovery
+            await self.remote.cmd_standby.start(timeout=STD_TIMEOUT)
+            await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
 
     async def test_controller_not_enabled(self):
         """Controller going out of enabled state should disable the CSC"""
