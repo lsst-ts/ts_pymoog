@@ -506,11 +506,6 @@ class BaseCsc(salobj.ConfigurableCsc):
         async with self.write_lock:
             await self.client.run_command(command)
 
-    async def do_clearError(self, data):
-        raise salobj.ExpectedError(
-            "Not implemented; to clear errors issue standby, start, and enable commands."
-        )
-
     def connect_callback(self, client):
         """Called when the client's command or telemetry sockets
         connect or disconnect.
