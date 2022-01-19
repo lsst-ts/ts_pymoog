@@ -6,6 +6,24 @@
 Version History
 ###############
 
+v0.26.0
+-------
+
+Changes:
+
+* Updated unit tests for compatibility with ts_salobj 6.8, which is now required.
+* `CONFIG_SCHEMA`: update id link to use `main` instead of `master`.
+* ``setup.cfg``: prevent pytest from checking version.py
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 6.8
+* ts_idl 3.6
+* ts_tcpip 0.1
+* ts_xml 7.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.25.0
 -------
 
