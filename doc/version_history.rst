@@ -6,6 +6,23 @@
 Version History
 ###############
 
+v0.27.0
+-------
+
+Changes:
+
+* `BaseCsc`: remove the ``clearError`` command (which was not supported, but still present in the XML).
+  This change requires ts_xml 10.2.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 6.8
+* ts_idl 3.6
+* ts_tcpip 0.1
+* ts_xml 10.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.26.0
 -------
 
