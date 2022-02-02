@@ -122,8 +122,6 @@ class BaseCsc(salobj.ConfigurableCsc):
     index : `int` or `None` (optional)
         SAL component index, or 0 or None if the component is not indexed.
         A value is required if the component is indexed.
-    sync_pattern : `int`
-        Sync pattern sent with commands.
     CommandCode : `enum`
         Command codes supported by the low-level controller.
         Must include an item ``SET_STATE``, the only command code
@@ -169,8 +167,7 @@ class BaseCsc(salobj.ConfigurableCsc):
     * host (string):
         TCP/IP host address of low-level controller.
     * port (integer):
-        TCP/IP command port of low-level controller.
-        The telemetry port is assumed to be one larger.
+        TCP/IP port of low-level controller.
     * connection_timeout (number):
         Time limit for connection to the low-level controller
 
@@ -183,7 +180,6 @@ class BaseCsc(salobj.ConfigurableCsc):
         *,
         name,
         index,
-        sync_pattern,
         CommandCode,
         ConfigClass,
         TelemetryClass,
@@ -199,7 +195,6 @@ class BaseCsc(salobj.ConfigurableCsc):
         self.CommandCode = CommandCode
         self.ConfigClass = ConfigClass
         self.TelemetryClass = TelemetryClass
-        self.sync_pattern = sync_pattern
         self.mock_ctrl = None
 
         # Set this False to simulate failing a connection to the low-level
@@ -254,9 +249,7 @@ class BaseCsc(salobj.ConfigurableCsc):
 
     @property
     def port(self):
-        """Get the command port of the low-level controller.
-
-        The telemetry port is one larger.
+        """Get the port of the low-level controller.
 
         The default implementation returns ``self.config.port``.
         This is not sufficient for the hexapods, which have a different
@@ -431,7 +424,6 @@ class BaseCsc(salobj.ConfigurableCsc):
         """
         command = structs.Command()
         command.code = self.CommandCode(code)
-        command.sync_pattern = self.sync_pattern
         command.param1 = param1
         command.param2 = param2
         command.param3 = param3
@@ -507,8 +499,7 @@ class BaseCsc(salobj.ConfigurableCsc):
             await self.client.run_command(command)
 
     def connect_callback(self, client):
-        """Called when the client's command or telemetry sockets
-        connect or disconnect.
+        """Called when the client socket connects or disconnects.
 
         Parameters
         ----------
@@ -516,8 +507,8 @@ class BaseCsc(salobj.ConfigurableCsc):
             TCP/IP client.
         """
         self.evt_connected.set_put(
-            command=client.command_connected,
-            telemetry=client.telemetry_connected,
+            command=client.connected,
+            telemetry=client.connected,
         )
         if client.should_be_connected and not client.connected:
             self.fault(
@@ -555,28 +546,24 @@ class BaseCsc(salobj.ConfigurableCsc):
                 if self.allow_mock_controller:
                     self.mock_ctrl = self.make_mock_controller(ControllerState.OFFLINE)
                     await self.mock_ctrl.start_task
-                    telemetry_port = self.mock_ctrl.telemetry_port
-                    command_port = self.mock_ctrl.command_port
+                    port = self.mock_ctrl.port
                 else:
                     self.log.warning(
                         "Not starting the mock controller because allow_mock_controller is False. "
                         "The CSC should fail to connect to the low-level controller and go to FAULT state."
                     )
-                    telemetry_port = self.port
-                    command_port = self.port + 1
+                    port = self.port
             else:
                 host = self.host
-                telemetry_port = self.port
-                command_port = self.port + 1
-            connect_descr = f"host={host}, telemetry_port={telemetry_port}, command_port={command_port}"
+                port = self.port
+            connect_descr = f"host={host}, port={port}"
             self.log.info(f"connect to {connect_descr}")
             self.client = CommandTelemetryClient(
                 log=self.log,
                 ConfigClass=self.ConfigClass,
                 TelemetryClass=self.TelemetryClass,
                 host=host,
-                command_port=command_port,
-                telemetry_port=telemetry_port,
+                port=port,
                 connect_callback=self.connect_callback,
                 config_callback=self.config_callback,
                 telemetry_callback=self.basic_telemetry_callback,
