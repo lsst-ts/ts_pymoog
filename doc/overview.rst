@@ -14,27 +14,25 @@ Contents include:
 * `BaseCsc`: base class for the main telescope and hexapod Commandable SAL Components (CSCs).
 * `CommandTelemetryClient`: A TCP/IP client that communicates with the low level controllers to send commands and receive telemetry.
 * `BaseMockController`: base class for mock controllers.
-* `CommandTelemetryServer`: A TCP/IP server for reading commands and writing telemetry.
-  Only one stream may be connected on each port.
-  `BaseMockController` inherits from this class.
-* `Command` and `Header`: C structures used for communication.
-* `SimpleMockController`: a simple mock controller for testing `BaseCsc` and `CommandTelemetryServer`.
+* `Command`, `CommandStatus`, and `Header`: C structures used for communication.
+* `SimpleMockController`: a simple mock controller for testing `BaseCsc` and `BaseMockController`.
 
 .. _lsst.ts.hexrotcomm_communication_protocol:
 
 TCP/IP Communication Protocol
 =============================
 
-The CSC communicates with the low-level controller using two unidirectional sockets:
-one to send commands to the low-level controller, the other to report configuration and state to the CSC.
+The CSC communicates with the low-level controller using TCP/IP.
 All data is sent as binary C data structures with no padding (the C structures are defined using ``__attribute__((__packed__))``).
+All data received from the low-level controller begins with a standard header that includes a frame_id field, which identifies the kind of message: command status, configuration, or telemetry.
+This allows the reader to read the rest of the message (after the header) into the correct data structure.
 
 The CSC connects to the low-level controller as part of the ``start`` command.
 
 The CSC enables the low-level controller (including clearing errors) as part of the ``enable`` command.
 
 The CSC disconnects from the low-level controller as part of the ``standby`` command.
-In addition, if the CSC loses its connection on either stream, it will disconnect both streams and go to fault state.
+If the CSC loses its connection unexpectedly, it will go to the fault state.
 
 If the low-level controller goes to fault state *while the CSC is enabled*,
 the CSC will also go to fault state, but remain connected.

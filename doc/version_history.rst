@@ -6,6 +6,33 @@
 Version History
 ###############
 
+v0.28.0
+-------
+
+Changes:
+
+* Update for ts_hexapod_controller 1.3.0 and ts_rotator_controller 1.4.0:
+
+    * Use a single socket for communication with the low-level controller.
+      Eliminate the `CommandTelemetryServer` class, moving its non-server functionality into `BaseMockController`.
+
+    * Use new standardized frame IDs for data from the low-level controller.
+      Provide these values in a new `FrameId` enum class.
+      Eliminate the FRAME_ID class constant in config and telemetry structs.
+
+    * `Command`: replace the ``sync_pattern`` field with ``commander``.
+      The new field has a standard value for commands from the CSC, which is provided as a `Command` class constant.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 6.8
+* ts_idl 3.6
+* ts_tcpip 0.1
+* ts_xml 10.2
+* ts_
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.27.0
 -------
 
