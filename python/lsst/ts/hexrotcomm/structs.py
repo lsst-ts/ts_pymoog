@@ -70,7 +70,7 @@ class Header(ctypes.Structure):
 
     _pack_ = 1
     _fields_ = [
-        ("frame_id", ctypes.c_ushort),
+        ("frame_id", ctypes.c_uint),
         ("counter", ctypes.c_uint),
         ("tai_sec", ctypes.c_int64),
         ("tai_nsec", ctypes.c_long),
