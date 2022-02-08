@@ -6,25 +6,6 @@
 Version History
 ###############
 
-v0.28.1
--------
-
-Changes:
-
-* `Header`: update the type of the ``frame_id`` field to match a change in the low-level controllers.
-* `CommandTelemetryClient`: expand the ``connected`` property to check that the reader is not None.
-  The main driver was to make type checkers happier, but it also adds a modicum of safety.
-
-Requires:
-
-* ts_utils 1
-* ts_salobj 6.8
-* ts_idl 3.6
-* ts_tcpip 0.1
-* ts_xml 10.2
-* ts_
-* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
-
 v0.28.0
 -------
 
@@ -41,6 +22,11 @@ Changes:
 
     * `Command`: replace the ``sync_pattern`` field with ``commander``.
       The new field has a standard value for commands from the CSC, which is provided as a `Command` class constant.
+
+    * `Header`: update the type of the ``frame_id`` field to match a change in the low-level controllers.
+
+* `CommandTelemetryClient`: expand the ``connected`` property to check that the reader is not None.
+  The main driver was to make type checkers happier, but it also adds a modicum of safety.
 
 Requires:
 
