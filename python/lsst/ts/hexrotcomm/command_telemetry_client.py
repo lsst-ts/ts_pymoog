@@ -178,7 +178,10 @@ class CommandTelemetryClient:
     def connected(self):
         """Return True if the command socket is connected."""
         return not (
-            self.writer is None or self.writer.is_closing() or self.reader.at_eof()
+            self.writer is None
+            or self.reader is None
+            or self.writer.is_closing()
+            or self.reader.at_eof()
         )
 
     async def close(self):
