@@ -84,7 +84,7 @@ class BaseCscTestCase(salobj.BaseCscTestCase):
             Time limit for the CSC to start (seconds).
         **kwargs : `dict`
             Extra keyword arguments for `basic_make_csc`.
-            For a configurable CSC this may include ``settings_to_apply``,
+            For a configurable CSC this may include ``override``,
             especially if ``initial_state`` is DISABLED or ENABLED.
 
         Notes

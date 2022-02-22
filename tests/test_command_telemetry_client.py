@@ -106,21 +106,21 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
         finally:
             await self.client.close()
 
-    def connect_callback(self, server):
+    async def connect_callback(self, server):
         self.connect_queue.put_nowait(server.connected)
         if self.callbacks_raise:
             raise RuntimeError(
                 "connect_callback raising because self.callbacks_raise is true"
             )
 
-    def config_callback(self, server):
+    async def config_callback(self, server):
         self.config_list.append(server.config)
         if self.callbacks_raise:
             raise RuntimeError(
                 "config_callback raising because self.callbacks_raise is true"
             )
 
-    def telemetry_callback(self, server):
+    async def telemetry_callback(self, server):
         self.telemetry_list.append(server.telemetry)
         if self.callbacks_raise:
             raise RuntimeError(
@@ -139,6 +139,29 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
         """
         is_connected = await asyncio.wait_for(self.connect_queue.get(), timeout=timeout)
         assert connected == is_connected
+
+    async def test_constructor_errors(self):
+        good_callbacks = dict(
+            config_callback=self.config_callback,
+            telemetry_callback=self.telemetry_callback,
+            connect_callback=self.connect_callback,
+        )
+
+        def non_coro_callback(_):
+            pass
+
+        for key in good_callbacks:
+            bad_callbacks = good_callbacks.copy()
+            bad_callbacks[key] = non_coro_callback
+            with pytest.raises(TypeError):
+                hexrotcomm.CommandTelemetryClient(
+                    log=self.mock_ctrl.log,
+                    ConfigClass=hexrotcomm.SimpleConfig,
+                    TelemetryClass=hexrotcomm.SimpleTelemetry,
+                    host=tcpip.LOCAL_HOST,
+                    port=self.mock_ctrl.port,
+                    **bad_callbacks,
+                )
 
     async def test_initial_conditions(self):
         async with self.make_client():
