@@ -6,6 +6,23 @@
 Version History
 ###############
 
+v0.28.1
+-------
+
+Changes:
+
+* Fix enabling of the low-level controller (DM-32902): wait for one telemetry sample after first connecting.
+* `BaseCsc`: eliminate the unused ``wait_summary_state`` method and add some long messages to ``enable_controller``.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 6.8
+* ts_idl 3.6
+* ts_tcpip 0.1
+* ts_xml 10.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.28.0
 -------
 
