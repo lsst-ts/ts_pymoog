@@ -355,28 +355,6 @@ class BaseCsc(salobj.ConfigurableCsc):
                 f"Rejected: initial state is {self.summary_state!r} instead of {state!r}"
             )
 
-    async def wait_summary_state(
-        self, state, max_telem=MAX_STATE_CHANGE_TELEMETRY_MESSAGES
-    ):
-        """Wait for the summary state to be as specified.
-
-        Parameters
-        ----------
-        state : `lsst.ts.salobj.State`
-            Allowed summary states.
-        max_telem : `int`
-            Maximum number of low-level telemetry messages to wait for.
-        """
-        state = salobj.State(state)
-        for i in range(max_telem):
-            self.assert_connected()
-            await self.client.next_telemetry()
-            if self.summary_state == state:
-                return
-        raise salobj.ExpectedError(
-            f"Failed: final state is {self.summary_state!r} instead of {state!r}"
-        )
-
     async def wait_controller_state(
         self, state, max_telem=MAX_STATE_CHANGE_TELEMETRY_MESSAGES
     ):
@@ -572,7 +550,10 @@ class BaseCsc(salobj.ConfigurableCsc):
                 self.client.connect_task, timeout=self.config.connection_timeout
             )
             connected = True
+            # Wait for configuration and telemetry, since we cannot safely
+            # issue commands until we know both.
             await asyncio.wait_for(self.client.configured_task, timeout=CONFIG_TIMEOUT)
+            await asyncio.wait_for(self.client.next_telemetry(), timeout=CONFIG_TIMEOUT)
         except asyncio.TimeoutError:
             error_code, err_msg = make_connect_error_info(
                 prefix="Timed out", connected=connected, connect_descr=connect_descr
@@ -621,11 +602,22 @@ class BaseCsc(salobj.ConfigurableCsc):
             A list of the initial controller state, and all controller states
             this function transitioned the low-level controller through,
             ending with the ControllerState.ENABLED.
+
+        Raises
+        ------
+        lsst.ts.salobj.ExpectedError
+            If the low-level controller is in fault state and the fault
+            cannot be cleared. Or if a state transition command fails
+            (which is unlikely).
         """
         self.assert_commandable()
 
         # Desired controller state
-        controller_state = ControllerState.ENABLED
+        desired_state = ControllerState.ENABLED
+
+        self.log.info(
+            f"Enable low-level controller; initial state={self.client.telemetry.state}"
+        )
 
         states = []
         if self.client.telemetry.state == ControllerState.FAULT:
@@ -644,17 +636,17 @@ class BaseCsc(salobj.ConfigurableCsc):
             # then check the resulting state
             await asyncio.sleep(1)
             if self.client.telemetry.state == ControllerState.FAULT:
-                raise salobj.ExpectedError(
-                    "Cannot clear low-level controller fault state"
-                )
+                errmsg = "Cannot clear low-level controller fault state"
+                self.log.error(errmsg)
+                raise salobj.ExpectedError(errmsg)
 
         current_state = self.client.telemetry.state
         states.append(current_state)
-        if current_state == controller_state:
-            # we are already in the desired controller_state
+        if current_state == desired_state:
+            # we are already in the desired state
             return states
 
-        command_state_list = _STATE_TRANSITION_DICT[(current_state, controller_state)]
+        command_state_list = _STATE_TRANSITION_DICT[(current_state, desired_state)]
 
         for command_param, resulting_state in command_state_list:
             self.assert_commandable()
@@ -663,12 +655,18 @@ class BaseCsc(salobj.ConfigurableCsc):
                 await self.run_command(
                     code=self.CommandCode.SET_STATE, param1=command_param
                 )
+                # Waiting for the controller state is not necessary, but it
+                # makes sure that the CSC publishes all intermediate
+                # controller states in the controllerState event,
+                # making the data more predictable and easier to understand.
                 await self.wait_controller_state(resulting_state)
                 current_state = resulting_state
             except Exception as e:
-                raise salobj.ExpectedError(
+                errmsg = (
                     f"SET_STATE command with param1={command_param!r} failed: {e!r}"
-                ) from e
+                )
+                self.log.error(errmsg)
+                raise salobj.ExpectedError(errmsg) from e
             states.append(resulting_state)
         return states
 
