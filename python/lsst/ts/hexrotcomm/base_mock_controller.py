@@ -21,18 +21,27 @@
 __all__ = ["BaseMockController"]
 
 import abc
+import asyncio
+import math
 
 from lsst.ts import tcpip
+from lsst.ts import utils
 from lsst.ts.idl.enums.MTRotator import (
     ControllerState,
     OfflineSubstate,
     EnabledSubstate,
 )
 from . import enums
-from .command_telemetry_server import CommandTelemetryServer, CommandError
+from . import structs
 
 
-class BaseMockController(CommandTelemetryServer, abc.ABC):
+class CommandError(Exception):
+    """Low-level command failed."""
+
+    pass
+
+
+class BaseMockController(tcpip.OneClientServer, abc.ABC):
     """Base class for a mock Moog TCP/IP controller with states.
 
     The controller uses two TCP/IP server sockets,
@@ -56,25 +65,19 @@ class BaseMockController(CommandTelemetryServer, abc.ABC):
     telemetry : `ctypes.Structure`
         Telemetry data. Modified by `update_telemetry`.
     port : `int`
-        Port for telemetry and configuration;
-        if nonzero then the command port will be one larger.
-        Specify 0 to choose random values for both ports;
-        this is recommended for unit tests, to avoid collision
-        with other tests.
-        Do not specify 0 with host=None (see Raises section).
+        TCP/IP port.
+        Specify 0 to choose a random free port; this is recommended
+        for unit tests, to avoid collision with other tests.
+        Do not specify 0 with host=None (see `lsst.ts.tcpip.OneClientServer`).
     host : `str` or `None`, optional
         IP address for this server. Typically "127.0.0.1" (the default)
         for an IPV4 server and "::" for an IPV6 server.
         If `None` then bind to all network interfaces and run both
         IPV4 and IPV6 servers.
-        Do not specify `None` with port=0 (see Raises section).
+        Do not specify `None` with port=0 (see
+        `lsst.ts.tcpip.OneClientServer` for details).
     initial_state : `lsst.ts.idl.enums.ControllerState` (optional)
         Initial state of mock controller.
-
-    Raises
-    ------
-    ValueError
-        If host=None and port=0. See `CommandTelemetryServer` for details.
 
     Notes
     -----
@@ -88,6 +91,9 @@ class BaseMockController(CommandTelemetryServer, abc.ABC):
         await ctrl.stop()
     """
 
+    # Interval between telemetry messages (seconds)
+    telemetry_interval = 0.1
+
     def __init__(
         self,
         log,
@@ -100,6 +106,8 @@ class BaseMockController(CommandTelemetryServer, abc.ABC):
         initial_state=ControllerState.OFFLINE,
     ):
         self.CommandCode = CommandCode
+        self.config = config
+        self.telemetry = telemetry
 
         # Dict of command key: command
         self.command_table = {
@@ -119,14 +127,27 @@ class BaseMockController(CommandTelemetryServer, abc.ABC):
         }
         self.command_table.update(extra_commands)
 
+        # A dictionary of frame ID: header for command status,
+        # telemetry and config data. Keeping separate headers for each
+        # allows updating just the relevant fields, rather than creating a new
+        # header insteance for each telemetry and config message.
+        self.headers = dict()
+        for frame_id in enums.FrameId:
+            header = structs.Header()
+            header.frame_id = frame_id
+            self.headers[frame_id] = header
+
         super().__init__(
-            log=log,
+            name="MockController",
             host=host,
-            config=config,
-            telemetry=telemetry,
             port=port,
+            log=log,
+            connect_callback=self.connect_callback,
         )
         self.set_state(initial_state)
+
+        self.command_loop_task = utils.make_done_future()
+        self.telemetry_loop_task = utils.make_done_future()
 
     @property
     def state(self):
@@ -156,17 +177,33 @@ class BaseMockController(CommandTelemetryServer, abc.ABC):
         return command.code
 
     def assert_state(self, state, offline_substate=None, enabled_substate=None):
+        """Check the state and, optionally, the substate.
+
+        Parameters
+        ----------
+        state : int
+            Required state.
+        offline_substate : int or None, optional
+            Required offline substate, or None to not check.
+        enabled_substate : int or None, optional
+            Required enabled substate, or None to not check.
+
+        Raises
+        ------
+        CommandError
+            If the state is not as expected.
+        """
         if self.state != state:
-            raise RuntimeError(
+            raise CommandError(
                 f"state={self.state!r}; must be {state!r} for this command."
             )
         if offline_substate is not None and self.offline_substate != offline_substate:
-            raise RuntimeError(
+            raise CommandError(
                 f"offline_substate={self.offline_substate!r}; "
                 f"must be {offline_substate!r} for this command."
             )
         if enabled_substate is not None and self.enabled_substate != enabled_substate:
-            raise RuntimeError(
+            raise CommandError(
                 f"enabled_substate={self.enabled_substate!r}; "
                 f"must be {enabled_substate!r} for this command."
             )
@@ -207,15 +244,33 @@ class BaseMockController(CommandTelemetryServer, abc.ABC):
             ControllerState.FAULT,
             ControllerState.STANDBY,
         ):
-            raise RuntimeError(
+            raise CommandError(
                 f"state={self.state!r}; must be FAULT or STANDBY for this command."
             )
         self.set_state(ControllerState.STANDBY)
 
     async def run_command(self, command):
+        """Run a command and wait for the reply.
+
+        Parameters
+        ----------
+        command : `Command`
+            The command to run.
+            This method sets the commander and counter fields.
+
+        Returns
+        -------
+        duration : `float`
+            Estimated duration (seconds) until the command is finished.
+            0 if the command is already done or almost already done.
+
+        Raises
+        ------
+        CommandError
+            If the command fails.
+        """
         self.log.debug(
             "run_command: "
-            f"sync_pattern={hex(command.sync_pattern)}; "
             f"counter={command.counter}; "
             f"command={self.CommandCode(command.code)!r}; "
             f"param1={command.param1}; "
@@ -295,3 +350,151 @@ class BaseMockController(CommandTelemetryServer, abc.ABC):
             the current time.
         """
         raise NotImplementedError()
+
+    def connect_callback(self, server):
+        """Called when the server connection state changes.
+
+        If connected: start the command and telemetry loops.
+        If not connected: stop the command and telemetry loops.
+        """
+        self.command_loop_task.cancel()
+        self.telemetry_loop_task.cancel()
+        if self.connected:
+            self.command_loop_task = asyncio.create_task(self.command_loop())
+            self.telemetry_loop_task = asyncio.create_task(self.telemetry_loop())
+
+    async def command_loop(self):
+        """Read and execute commands."""
+        self.log.info("command_loop begins")
+        while self.connected:
+            try:
+                command = structs.Command()
+                await tcpip.read_into(self.reader, command)
+                try:
+                    duration = await self.run_command(command)
+                except CommandError as e:
+                    await self.write_command_status(
+                        counter=command.counter,
+                        status=enums.CommandStatusCode.NO_ACK,
+                        reason=e.args[0],
+                    )
+                except Exception as e:
+                    self.log.exception("Command failed (without raising CommandError)")
+                    await self.write_command_status(
+                        counter=command.counter,
+                        status=enums.CommandStatusCode.NO_ACK,
+                        reason=str(e),
+                    )
+                else:
+                    if duration is None:
+                        duration = 0
+                    await self.write_command_status(
+                        counter=command.counter,
+                        status=enums.CommandStatusCode.ACK,
+                        duration=duration,
+                    )
+
+            except asyncio.CancelledError:
+                raise
+            except ConnectionError:
+                self.log.error("Socket closed")
+                asyncio.create_task(self.close_client())
+            except Exception:
+                self.log.exception("command_loop failed")
+                asyncio.create_task(self.close_client())
+
+    async def close_client(self):
+        """Close the connected client (if any) and stop background tasks."""
+        self.command_loop_task.cancel()
+        self.telemetry_loop_task.cancel()
+        await super().close_client()
+
+    async def telemetry_loop(self):
+        """Write configuration once, then telemetry at regular intervals."""
+        self.log.info("telemetry_loop begins")
+        try:
+            if self.connected:
+                await self.write_config()
+            # Checking self.writer is not None makes mypy happy
+            while self.connected and self.writer is not None:
+                header, curr_tai = self.update_and_get_header(enums.FrameId.TELEMETRY)
+                await self.update_telemetry(curr_tai=curr_tai)
+                await tcpip.write_from(self.writer, header, self.telemetry)
+                await asyncio.sleep(self.telemetry_interval)
+            self.log.info("Socket disconnected")
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            self.log.exception("telemetry_loop failed")
+
+    def update_and_get_header(self, frame_id):
+        """Update the config or telemetry header and return it and the time.
+
+        Call this prior to writing configuration or telemetry.
+
+        Parameters
+        ----------
+        frame_id : `int`
+            Frame ID of header to write.
+
+        Returns
+        -------
+        header : `structs.Header`
+            The header.
+        curr_tai : `float`
+            Current time in header timestamp (TAI, unix seconds).
+        """
+        header = self.headers[frame_id]
+        curr_tai = utils.current_tai()
+        tai_frac, tai_sec = math.modf(curr_tai)
+        header.tai_sec = int(tai_sec)
+        header.tai_nsec = int(tai_frac * 1e9)
+        return header, curr_tai
+
+    async def write_config(self):
+        """Write the current configuration.
+
+        Raises
+        ------
+        RuntimeError
+            If not connected.
+        """
+        # Checking self.writer is not None makes mypy happy
+        if not self.connected or self.writer is None:
+            raise RuntimeError("Not connected")
+        header, curr_tai = self.update_and_get_header(enums.FrameId.CONFIG)
+        await tcpip.write_from(self.writer, header, self.config)
+
+    async def write_command_status(self, counter, status, duration=0, reason=""):
+        """Write a command status.
+
+        Parameters
+        ----------
+        counter : `int`
+            counter field of command being acknowledged.
+        status : `CommandStatusCode`
+            Command status code.
+        duration : `float` or `None`, optional
+            Estimated duration. None is treated as 0.
+        reason : `str`, optional
+            Reason for failure. Should be non-blank if and only if the
+            command failed.
+
+        Raises
+        ------
+        RuntimeError
+            If not connected.
+        """
+        # Checking self.writer is not None makes mypy happy
+        if not self.connected or self.writer is None:
+            raise RuntimeError("Not connected")
+        if duration is None:
+            duration = 0
+        header, curr_tai = self.update_and_get_header(enums.FrameId.COMMAND_STATUS)
+        header.counter = counter
+        command_status = structs.CommandStatus(
+            status=status,
+            duration=duration,
+            reason=reason.encode()[0 : structs.COMMAND_STATUS_REASON_LEN],
+        )
+        await tcpip.write_from(self.writer, header, command_status)

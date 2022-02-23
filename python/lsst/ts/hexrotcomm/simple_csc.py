@@ -99,7 +99,6 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         super().__init__(
             name="MTRotator",
             index=0,
-            sync_pattern=hexrotcomm.SIMPLE_SYNC_PATTERN,
             CommandCode=simple_mock_controller.SimpleCommandCode,
             ConfigClass=simple_mock_controller.SimpleConfig,
             TelemetryClass=simple_mock_controller.SimpleTelemetry,

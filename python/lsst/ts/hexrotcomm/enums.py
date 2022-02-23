@@ -19,7 +19,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-__all__ = ["CommandStatusCode", "SetStateParam"]
+__all__ = ["CommandStatusCode", "FrameId", "SetStateParam"]
 
 import enum
 
@@ -32,6 +32,14 @@ class CommandStatusCode(enum.IntEnum):
 
     ACK = 1
     NO_ACK = 2
+
+
+class FrameId(enum.IntEnum):
+    """Frame ID for each message type."""
+
+    COMMAND_STATUS = 1
+    TELEMETRY = 2
+    CONFIG = 3
 
 
 class SetStateParam(enum.IntEnum):

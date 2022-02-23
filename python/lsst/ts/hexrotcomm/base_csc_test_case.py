@@ -34,8 +34,6 @@ from lsst.ts import salobj
 # Long to avoid unnecessary timeouts on slow CI systems.
 STD_TIMEOUT = 60
 
-SIMPLE_SYNC_PATTERN = 0x1234
-
 
 class BaseCscTestCase(salobj.BaseCscTestCase):
     """A variant of salobj.BaseCscTestCase that captures all but the last

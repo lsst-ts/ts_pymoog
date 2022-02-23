@@ -6,6 +6,55 @@
 Version History
 ###############
 
+v0.28.1
+-------
+
+Changes:
+
+* Fix enabling of the low-level controller (DM-32902): wait for one telemetry sample after first connecting.
+* `BaseCsc`: eliminate the unused ``wait_summary_state`` method and add some long messages to ``enable_controller``.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 6.8
+* ts_idl 3.6
+* ts_tcpip 0.1
+* ts_xml 10.2
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
+v0.28.0
+-------
+
+Changes:
+
+* Update for ts_hexapod_controller 1.3.0 and ts_rotator_controller 1.4.0:
+
+    * Use a single socket for communication with the low-level controller.
+      Eliminate the `CommandTelemetryServer` class, moving its non-server functionality into `BaseMockController`.
+
+    * Use new standardized frame IDs for data from the low-level controller.
+      Provide these values in a new `FrameId` enum class.
+      Eliminate the FRAME_ID class constant in config and telemetry structs.
+
+    * `Command`: replace the ``sync_pattern`` field with ``commander``.
+      The new field has a standard value for commands from the CSC, which is provided as a `Command` class constant.
+
+    * `Header`: update the type of the ``frame_id`` field to match a change in the low-level controllers.
+
+* `CommandTelemetryClient`: expand the ``connected`` property to check that the reader is not None.
+  The main driver was to make type checkers happier, but it also adds a modicum of safety.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 6.8
+* ts_idl 3.6
+* ts_tcpip 0.1
+* ts_xml 10.2
+* ts_
+* MTRotator IDL file, e.g. built using ``make_idl_file.py MTRotator`` (for `SimpleCsc` and unit tests)
+
 v0.27.0
 -------
 

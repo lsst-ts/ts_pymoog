@@ -34,7 +34,6 @@ from lsst.ts.tcpip import (
 from .enums import *
 from .structs import *
 from .command_telemetry_client import *
-from .command_telemetry_server import *
 from .base_mock_controller import *
 from .simple_mock_controller import *
 from .base_csc import *

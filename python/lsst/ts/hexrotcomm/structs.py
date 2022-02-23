@@ -35,7 +35,7 @@ class Command(ctypes.Structure):
 
     _pack_ = 1
     _fields_ = [
-        ("sync_pattern", ctypes.c_ushort),
+        ("commander", ctypes.c_uint),
         ("counter", ctypes.c_uint),
         ("code", ctypes.c_uint),
         ("param1", ctypes.c_double),
@@ -45,6 +45,7 @@ class Command(ctypes.Structure):
         ("param5", ctypes.c_double),
         ("param6", ctypes.c_double),
     ]
+    COMMANDER = 2  # value of the commander field for a CSC
 
 
 class CommandStatus(ctypes.Structure):
@@ -59,7 +60,6 @@ class CommandStatus(ctypes.Structure):
         ("duration", ctypes.c_double),
         ("reason", ctypes.c_char * COMMAND_STATUS_REASON_LEN),
     ]
-    FRAME_ID = 0x1
 
 
 class Header(ctypes.Structure):
@@ -70,8 +70,7 @@ class Header(ctypes.Structure):
 
     _pack_ = 1
     _fields_ = [
-        ("sync_pattern", ctypes.c_ushort),
-        ("frame_id", ctypes.c_ushort),
+        ("frame_id", ctypes.c_uint),
         ("counter", ctypes.c_uint),
         ("tai_sec", ctypes.c_int64),
         ("tai_nsec", ctypes.c_long),

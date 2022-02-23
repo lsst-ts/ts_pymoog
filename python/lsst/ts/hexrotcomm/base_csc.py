@@ -122,8 +122,6 @@ class BaseCsc(salobj.ConfigurableCsc):
     index : `int` or `None` (optional)
         SAL component index, or 0 or None if the component is not indexed.
         A value is required if the component is indexed.
-    sync_pattern : `int`
-        Sync pattern sent with commands.
     CommandCode : `enum`
         Command codes supported by the low-level controller.
         Must include an item ``SET_STATE``, the only command code
@@ -169,8 +167,7 @@ class BaseCsc(salobj.ConfigurableCsc):
     * host (string):
         TCP/IP host address of low-level controller.
     * port (integer):
-        TCP/IP command port of low-level controller.
-        The telemetry port is assumed to be one larger.
+        TCP/IP port of low-level controller.
     * connection_timeout (number):
         Time limit for connection to the low-level controller
 
@@ -183,7 +180,6 @@ class BaseCsc(salobj.ConfigurableCsc):
         *,
         name,
         index,
-        sync_pattern,
         CommandCode,
         ConfigClass,
         TelemetryClass,
@@ -199,7 +195,6 @@ class BaseCsc(salobj.ConfigurableCsc):
         self.CommandCode = CommandCode
         self.ConfigClass = ConfigClass
         self.TelemetryClass = TelemetryClass
-        self.sync_pattern = sync_pattern
         self.mock_ctrl = None
 
         # Set this False to simulate failing a connection to the low-level
@@ -254,9 +249,7 @@ class BaseCsc(salobj.ConfigurableCsc):
 
     @property
     def port(self):
-        """Get the command port of the low-level controller.
-
-        The telemetry port is one larger.
+        """Get the port of the low-level controller.
 
         The default implementation returns ``self.config.port``.
         This is not sufficient for the hexapods, which have a different
@@ -362,28 +355,6 @@ class BaseCsc(salobj.ConfigurableCsc):
                 f"Rejected: initial state is {self.summary_state!r} instead of {state!r}"
             )
 
-    async def wait_summary_state(
-        self, state, max_telem=MAX_STATE_CHANGE_TELEMETRY_MESSAGES
-    ):
-        """Wait for the summary state to be as specified.
-
-        Parameters
-        ----------
-        state : `lsst.ts.salobj.State`
-            Allowed summary states.
-        max_telem : `int`
-            Maximum number of low-level telemetry messages to wait for.
-        """
-        state = salobj.State(state)
-        for i in range(max_telem):
-            self.assert_connected()
-            await self.client.next_telemetry()
-            if self.summary_state == state:
-                return
-        raise salobj.ExpectedError(
-            f"Failed: final state is {self.summary_state!r} instead of {state!r}"
-        )
-
     async def wait_controller_state(
         self, state, max_telem=MAX_STATE_CHANGE_TELEMETRY_MESSAGES
     ):
@@ -431,7 +402,6 @@ class BaseCsc(salobj.ConfigurableCsc):
         """
         command = structs.Command()
         command.code = self.CommandCode(code)
-        command.sync_pattern = self.sync_pattern
         command.param1 = param1
         command.param2 = param2
         command.param3 = param3
@@ -507,8 +477,7 @@ class BaseCsc(salobj.ConfigurableCsc):
             await self.client.run_command(command)
 
     def connect_callback(self, client):
-        """Called when the client's command or telemetry sockets
-        connect or disconnect.
+        """Called when the client socket connects or disconnects.
 
         Parameters
         ----------
@@ -516,8 +485,8 @@ class BaseCsc(salobj.ConfigurableCsc):
             TCP/IP client.
         """
         self.evt_connected.set_put(
-            command=client.command_connected,
-            telemetry=client.telemetry_connected,
+            command=client.connected,
+            telemetry=client.connected,
         )
         if client.should_be_connected and not client.connected:
             self.fault(
@@ -555,28 +524,24 @@ class BaseCsc(salobj.ConfigurableCsc):
                 if self.allow_mock_controller:
                     self.mock_ctrl = self.make_mock_controller(ControllerState.OFFLINE)
                     await self.mock_ctrl.start_task
-                    telemetry_port = self.mock_ctrl.telemetry_port
-                    command_port = self.mock_ctrl.command_port
+                    port = self.mock_ctrl.port
                 else:
                     self.log.warning(
                         "Not starting the mock controller because allow_mock_controller is False. "
                         "The CSC should fail to connect to the low-level controller and go to FAULT state."
                     )
-                    telemetry_port = self.port
-                    command_port = self.port + 1
+                    port = self.port
             else:
                 host = self.host
-                telemetry_port = self.port
-                command_port = self.port + 1
-            connect_descr = f"host={host}, telemetry_port={telemetry_port}, command_port={command_port}"
+                port = self.port
+            connect_descr = f"host={host}, port={port}"
             self.log.info(f"connect to {connect_descr}")
             self.client = CommandTelemetryClient(
                 log=self.log,
                 ConfigClass=self.ConfigClass,
                 TelemetryClass=self.TelemetryClass,
                 host=host,
-                command_port=command_port,
-                telemetry_port=telemetry_port,
+                port=port,
                 connect_callback=self.connect_callback,
                 config_callback=self.config_callback,
                 telemetry_callback=self.basic_telemetry_callback,
@@ -585,7 +550,10 @@ class BaseCsc(salobj.ConfigurableCsc):
                 self.client.connect_task, timeout=self.config.connection_timeout
             )
             connected = True
+            # Wait for configuration and telemetry, since we cannot safely
+            # issue commands until we know both.
             await asyncio.wait_for(self.client.configured_task, timeout=CONFIG_TIMEOUT)
+            await asyncio.wait_for(self.client.next_telemetry(), timeout=CONFIG_TIMEOUT)
         except asyncio.TimeoutError:
             error_code, err_msg = make_connect_error_info(
                 prefix="Timed out", connected=connected, connect_descr=connect_descr
@@ -634,11 +602,22 @@ class BaseCsc(salobj.ConfigurableCsc):
             A list of the initial controller state, and all controller states
             this function transitioned the low-level controller through,
             ending with the ControllerState.ENABLED.
+
+        Raises
+        ------
+        lsst.ts.salobj.ExpectedError
+            If the low-level controller is in fault state and the fault
+            cannot be cleared. Or if a state transition command fails
+            (which is unlikely).
         """
         self.assert_commandable()
 
         # Desired controller state
-        controller_state = ControllerState.ENABLED
+        desired_state = ControllerState.ENABLED
+
+        self.log.info(
+            f"Enable low-level controller; initial state={self.client.telemetry.state}"
+        )
 
         states = []
         if self.client.telemetry.state == ControllerState.FAULT:
@@ -657,17 +636,17 @@ class BaseCsc(salobj.ConfigurableCsc):
             # then check the resulting state
             await asyncio.sleep(1)
             if self.client.telemetry.state == ControllerState.FAULT:
-                raise salobj.ExpectedError(
-                    "Cannot clear low-level controller fault state"
-                )
+                errmsg = "Cannot clear low-level controller fault state"
+                self.log.error(errmsg)
+                raise salobj.ExpectedError(errmsg)
 
         current_state = self.client.telemetry.state
         states.append(current_state)
-        if current_state == controller_state:
-            # we are already in the desired controller_state
+        if current_state == desired_state:
+            # we are already in the desired state
             return states
 
-        command_state_list = _STATE_TRANSITION_DICT[(current_state, controller_state)]
+        command_state_list = _STATE_TRANSITION_DICT[(current_state, desired_state)]
 
         for command_param, resulting_state in command_state_list:
             self.assert_commandable()
@@ -676,12 +655,18 @@ class BaseCsc(salobj.ConfigurableCsc):
                 await self.run_command(
                     code=self.CommandCode.SET_STATE, param1=command_param
                 )
+                # Waiting for the controller state is not necessary, but it
+                # makes sure that the CSC publishes all intermediate
+                # controller states in the controllerState event,
+                # making the data more predictable and easier to understand.
                 await self.wait_controller_state(resulting_state)
                 current_state = resulting_state
             except Exception as e:
-                raise salobj.ExpectedError(
+                errmsg = (
                     f"SET_STATE command with param1={command_param!r} failed: {e!r}"
-                ) from e
+                )
+                self.log.error(errmsg)
+                raise salobj.ExpectedError(errmsg) from e
             states.append(resulting_state)
         return states
 

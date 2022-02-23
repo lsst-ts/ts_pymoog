@@ -19,7 +19,6 @@
 # You should have received a copy of the GNU General Public License
 
 __all__ = [
-    "SIMPLE_SYNC_PATTERN",
     "SIMPLE_TELEMETRY_PORT",
     "SimpleCommandCode",
     "SimpleConfig",
@@ -32,13 +31,10 @@ import enum
 
 from lsst.ts import tcpip
 from lsst.ts.idl.enums.MTRotator import ControllerState, ApplicationStatus
-from .base_mock_controller import BaseMockController
-from .command_telemetry_server import CommandError
+from .base_mock_controller import BaseMockController, CommandError
 
 
-SIMPLE_SYNC_PATTERN = 0x1234
-
-# Telemetry/configuration port. The command port is one larger.
+# Default port for the mock controller.
 # This is an arbitrary value chosen to be well away from the telemetry ports
 # for the MT camera rotator and two MT hexapods.
 SIMPLE_TELEMETRY_PORT = 6210
@@ -63,7 +59,6 @@ class SimpleConfig(ctypes.Structure):
         ("max_position", ctypes.c_double),
         ("max_velocity", ctypes.c_double),
     ]
-    FRAME_ID = 0x19
 
 
 class SimpleTelemetry(ctypes.Structure):
@@ -78,7 +73,6 @@ class SimpleTelemetry(ctypes.Structure):
         ("curr_position", ctypes.c_double),
         ("cmd_position", ctypes.c_double),
     ]
-    FRAME_ID = 0x5
 
 
 class SimpleMockController(BaseMockController):
@@ -92,24 +86,19 @@ class SimpleMockController(BaseMockController):
     log : `logging.Logger`
         Logger.
     port : `int`
-        Port for telemetry and configuration;
-        if nonzero then the command port will be one larger.
+        Port for the TCP/IP server.
         Specify 0 to choose random values for both ports;
         this is recommended for unit tests, to avoid collision
         with other tests.
     initial_state : `lsst.ts.idl.enums.ControllerState` (optional)
         Initial state of mock controller.
     host : `str` or `None`, optional
-        IP address for this server. Typically "127.0.0.1" (the default)
+        IP address for the TCP/IP server. Typically "127.0.0.1" (the default)
         for an IPV4 server and "::" for an IPV6 server.
         If `None` then bind to all network interfaces and run both
         IPV4 and IPV6 servers.
-        Do not specify `None` with port=0 (see Raises section).
-
-    Raises
-    ------
-    ValueError
-        If host=None and port=0. See `CommandTelemetryServer` for details.
+        Do not specify `None` with port=0 (see
+        `lsst.ts.tcpip.OneClientServer` for details).
 
     Notes
     -----
