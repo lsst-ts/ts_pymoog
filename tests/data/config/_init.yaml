@@ -1,0 +1,3 @@
+host: localhost
+port: 5570
+connection_timeout: 10

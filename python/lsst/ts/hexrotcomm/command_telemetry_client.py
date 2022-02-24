@@ -21,6 +21,7 @@
 __all__ = ["CommandTelemetryClient"]
 
 import asyncio
+import inspect
 import ctypes
 
 from lsst.ts import utils
@@ -50,14 +51,14 @@ class CommandTelemetryClient:
         IP address of CSC server.
     port : `int`
         Server port.
-    connect_callback : callable
-        Function to call when a connection is made or dropped.
+    connect_callback : coroutine
+        Coroutine to call when a connection is made or dropped.
         The function receives one argument: this client.
-    config_callback : callable
-        Function to call when configuration is read.
+    config_callback : coroutine
+        Coroutine to call when configuration is read.
         The function receives one argument: this client.
-    telemetry_callback : callable
-        Function to call when telemetry is read.
+    telemetry_callback : coroutine
+        Coroutine to call when telemetry is read.
         The function receives one argument: this client.
     connect_timeout : `float`, optional
         Time limit for a connection to be made (seconds).
@@ -82,11 +83,11 @@ class CommandTelemetryClient:
         The ``host`` constructor argument.
     port : `int`
         The ``port`` constructor argument.
-    connect_callback : callable
+    connect_callback : coroutine
         The ``connect_callback`` constructor argument.
-    config_callback : callable
+    config_callback : coroutine
         The ``config_callback`` constructor argument.
-    telemetry_callback : callable
+    telemetry_callback : coroutine
         The ``telemetry_callback`` constructor argument.
     reader : `asyncio.StreamReader` or `None`
         Stream reader for reading data from the low-level controller.
@@ -105,6 +106,11 @@ class CommandTelemetryClient:
         the disconnection was unexpected and indicates a problem.
         `connect` sets this true when it finishes successfully,
         and `disconnect` set it false as it begins.
+
+    Raises
+    ------
+    TypeError
+        If any of the callbacks is not a coroutine.
 
     Notes
     -----
@@ -131,6 +137,11 @@ class CommandTelemetryClient:
         telemetry_callback,
         connect_timeout=10,
     ):
+        for arg_name in ("connect_callback", "config_callback", "telemetry_callback"):
+            arg_value = locals()[arg_name]
+            if not inspect.iscoroutinefunction(arg_value):
+                raise TypeError(f"{arg_name} must be a coroutine")
+
         self.log = log.getChild("BaseMockController")
         self.header = structs.Header()
         self.config = ConfigClass()
@@ -207,7 +218,7 @@ class CommandTelemetryClient:
                 await tcpip.close_stream_writer(self.writer)
             except asyncio.CancelledError:
                 pass
-        self.call_connect_callback()
+        asyncio.create_task(self.call_connect_callback())
 
     async def connect(self):
         """Connect to the command socket.
@@ -226,7 +237,7 @@ class CommandTelemetryClient:
             self.should_be_connected = True
             self.log.debug("connect: connected")
             self._read_loop_task = asyncio.create_task(self.read_loop())
-            self.call_connect_callback()
+            await self.call_connect_callback()
         except asyncio.CancelledError:
             self.debug("connect cancelled")
             await self.basic_close()
@@ -243,13 +254,13 @@ class CommandTelemetryClient:
             await self.basic_close()
             raise
 
-    def call_connect_callback(self):
+    async def call_connect_callback(self):
         """Call the connect_callback if connection state has changed."""
         was_connected = self.connected
         if was_connected != self._was_connected:
             self._was_connected = was_connected
             try:
-                self.connect_callback(self)
+                await self.connect_callback(self)
             except Exception:
                 self.log.exception("connect_callback failed.")
         else:
@@ -288,7 +299,7 @@ class CommandTelemetryClient:
                 elif self.header.frame_id == enums.FrameId.CONFIG:
                     await tcpip.read_into(self.reader, self.config)
                     try:
-                        self.config_callback(self)
+                        await self.config_callback(self)
                         if not self.configured_task.done():
                             self.configured_task.set_result(None)
                     except Exception as e:
@@ -300,7 +311,7 @@ class CommandTelemetryClient:
                     if not self._telemetry_task.done():
                         self._telemetry_task.set_result(None)
                     try:
-                        self.telemetry_callback(self)
+                        await self.telemetry_callback(self)
                     except Exception:
                         self.log.exception("telemetry_callback failed.")
                 else:

@@ -29,7 +29,7 @@ CONFIG_SCHEMA = yaml.safe_load(
     """
 $schema: http://json-schema.org/draft-07/schema#
 $id: https://github.com/lsst-ts/ts_hexrotcomm/blob/main/python/lsst/ts/hexrotcomm/config_schema.py
-title: MTRotator v1
+title: MTRotator v2
 description: Configuration for SimpleCsc, which has no configuration.
 type: object
 properties:
@@ -39,18 +39,15 @@ properties:
       Ignored for SimpleCsc, because it always runs in simulation mode.
     type: string
     format: hostname
-    default: "127.0.0.1"
   port:
     description: >-
       Port number of the TCP/IP interface.
       Ignored for SimpleCsc, because it always runs in simulation mode.
     type: integer
-    default: 0
   connection_timeout:
     description: Time limit for connecting to the TCP/IP interface (sec)
     type: number
     exclusiveMinimum: 0
-    default: 10
 required: [host, port, connection_timeout]
 additionalProperties: false
 """
