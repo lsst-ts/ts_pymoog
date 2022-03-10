@@ -48,9 +48,9 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         that it is a valid value) except in simulation mode,
         because in normal operation the initial state is the current state
         of the controller. This is provided for unit testing.
-    settings_to_apply : `str`, optional
-        Settings to apply if ``initial_state`` is `State.DISABLED`
-        or `State.ENABLED`.
+    override : `str`, optional
+        Configuration override file to apply if ``initial_state`` is
+        `State.DISABLED` or `State.ENABLED`.
     simulation_mode : `int` (optional)
         Simulation mode. Allowed values:
 
@@ -94,7 +94,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         config_dir=None,
         initial_state=salobj.State.STANDBY,
         simulation_mode=1,
-        settings_to_apply="",
+        override="",
     ):
         super().__init__(
             name="MTRotator",
@@ -105,7 +105,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
             config_schema=CONFIG_SCHEMA,
             config_dir=config_dir,
             initial_state=initial_state,
-            settings_to_apply=settings_to_apply,
+            override=override,
             simulation_mode=simulation_mode,
         )
 
@@ -144,7 +144,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     async def do_trackStart(self, data):
         raise salobj.ExpectedError("Not implemented")
 
-    def config_callback(self, client):
+    async def config_callback(self, client):
         """Called when the TCP/IP controller outputs configuration.
 
         Parameters
@@ -152,7 +152,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         client : `CommandTelemetryClient`
             TCP/IP client.
         """
-        self.evt_configuration.set_put(
+        await self.evt_configuration.set_write(
             positionAngleUpperLimit=client.config.max_position,
             velocityLimit=client.config.max_velocity,
             accelerationLimit=0,
@@ -161,9 +161,9 @@ class SimpleCsc(hexrotcomm.BaseCsc):
             trackingSuccessPositionThreshold=0,
             trackingLostTimeout=0,
         )
-        self.evt_commandableByDDS.set_put(state=True)
+        await self.evt_commandableByDDS.set_write(state=True)
 
-    def telemetry_callback(self, client):
+    async def telemetry_callback(self, client):
         """Called when the TCP/IP controller outputs telemetry.
 
         Parameters
@@ -174,19 +174,19 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         # Strangely telemetry.state, offline_substate and enabled_substate
         # are all floats from the controller. But they should only have
         # integer value, so I output them as integers.
-        self.evt_controllerState.set_put(
+        await self.evt_controllerState.set_write(
             controllerState=int(client.telemetry.state),
             offlineSubstate=int(client.telemetry.offline_substate),
             enabledSubstate=int(client.telemetry.enabled_substate),
         )
-        self.evt_commandableByDDS.set_put(
+        await self.evt_commandableByDDS.set_write(
             state=bool(
                 client.telemetry.application_status
                 & ApplicationStatus.DDS_COMMAND_SOURCE
             )
         )
 
-        self.tel_rotation.set_put(
+        await self.tel_rotation.set_write(
             demandPosition=client.telemetry.cmd_position,
             actualPosition=client.telemetry.curr_position,
             timestamp=utils.current_tai(),

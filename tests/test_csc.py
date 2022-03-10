@@ -36,7 +36,7 @@ from lsst.ts.idl.enums.MTRotator import (
 
 STD_TIMEOUT = 5  # timeout for command ack
 
-LOCAL_CONFIG_DIR = pathlib.Path(__file__).parent / "data" / "config"
+TEST_CONFIG_DIR = pathlib.Path(__file__).parent / "data" / "config"
 
 
 class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
@@ -50,12 +50,17 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
     async def test_constructor_errors(self):
         for bad_initial_state in (0, salobj.State.OFFLINE, max(salobj.State) + 1):
             with pytest.raises(ValueError):
-                hexrotcomm.SimpleCsc(initial_state=bad_initial_state, simulation_mode=1)
+                hexrotcomm.SimpleCsc(
+                    initial_state=bad_initial_state,
+                    config_dir=TEST_CONFIG_DIR,
+                    simulation_mode=1,
+                )
 
         for bad_simulation_mode in (-1, 0, 2):
             with pytest.raises(ValueError):
                 hexrotcomm.SimpleCsc(
                     initial_state=salobj.State.STANDBY,
+                    config_dir=TEST_CONFIG_DIR,
                     simulation_mode=bad_simulation_mode,
                 )
 
@@ -73,6 +78,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             with pytest.raises(ValueError):
                 hexrotcomm.SimpleCsc(
                     initial_state=bad_initial_state,
+                    config_dir=TEST_CONFIG_DIR,
                     simulation_mode=0,
                 )
 
@@ -80,22 +86,22 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             simulation_mode=1,
-            config_dir=LOCAL_CONFIG_DIR,
+            config_dir=TEST_CONFIG_DIR,
         ):
             # Try config files with invalid data.
             # The command should fail and the summary state remain in STANDBY.
-            for bad_config_path in LOCAL_CONFIG_DIR.glob("bad_*.yaml"):
+            for bad_config_path in TEST_CONFIG_DIR.glob("bad_*.yaml"):
                 bad_config_name = bad_config_path.name
                 with self.subTest(bad_config_name=bad_config_name):
                     with salobj.assertRaisesAckError():
                         await self.remote.cmd_start.set_start(
-                            settingsToApply=bad_config_name, timeout=STD_TIMEOUT
+                            configurationOverride=bad_config_name, timeout=STD_TIMEOUT
                         )
                     assert self.csc.summary_state == salobj.State.STANDBY
 
-            # Now try a valid config file
+            # Now try a valid config
             await self.remote.cmd_start.set_start(
-                settingsToApply="valid.yaml", timeout=STD_TIMEOUT
+                configurationOverride="", timeout=STD_TIMEOUT
             )
             assert self.csc.summary_state == salobj.State.DISABLED
 
@@ -104,7 +110,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
             simulation_mode=1,
-            config_dir=LOCAL_CONFIG_DIR,
+            config_dir=TEST_CONFIG_DIR,
         ):
             await self.assert_next_sample(
                 topic=self.remote.evt_controllerState,
@@ -132,7 +138,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             simulation_mode=1,
-            config_dir=LOCAL_CONFIG_DIR,
+            config_dir=TEST_CONFIG_DIR,
         ):
             await self.assert_next_summary_state(salobj.State.STANDBY)
             await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
@@ -158,7 +164,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             async with self.make_csc(
                 initial_state=salobj.State.STANDBY,
                 simulation_mode=1,
-                config_dir=LOCAL_CONFIG_DIR,
+                config_dir=TEST_CONFIG_DIR,
             ):
                 await self.assert_next_summary_state(salobj.State.STANDBY)
                 await self.assert_next_sample(
@@ -185,7 +191,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
             simulation_mode=1,
-            config_dir=LOCAL_CONFIG_DIR,
+            config_dir=TEST_CONFIG_DIR,
         ):
             assert self.csc.client.should_be_connected
             await self.assert_next_sample(
@@ -212,7 +218,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
             simulation_mode=1,
-            config_dir=LOCAL_CONFIG_DIR,
+            config_dir=TEST_CONFIG_DIR,
         ):
             await self.assert_next_sample(
                 topic=self.remote.evt_controllerState,
@@ -233,7 +239,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
             simulation_mode=1,
-            config_dir=LOCAL_CONFIG_DIR,
+            config_dir=TEST_CONFIG_DIR,
         ):
             await self.assert_next_sample(
                 topic=self.remote.evt_controllerState,
@@ -282,7 +288,11 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
     async def test_move(self):
         """Test the move command."""
         destination = 2  # a small move so the test runs quickly
-        async with self.make_csc(initial_state=salobj.State.ENABLED, simulation_mode=1):
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            simulation_mode=1,
+            config_dir=TEST_CONFIG_DIR,
+        ):
             await self.assert_next_summary_state(salobj.State.ENABLED)
             await self.assert_next_sample(
                 topic=self.remote.evt_controllerState,
@@ -299,7 +309,11 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
     async def test_run_multiple_commands(self):
         """Test BaseCsc.run_multiple_commands."""
         target_positions = (1, 2, 3)  # Small moves so the test runs quickly
-        async with self.make_csc(initial_state=salobj.State.ENABLED, simulation_mode=1):
+        async with self.make_csc(
+            initial_state=salobj.State.ENABLED,
+            simulation_mode=1,
+            config_dir=TEST_CONFIG_DIR,
+        ):
             await self.assert_next_sample(
                 topic=self.remote.evt_controllerState,
                 controllerState=ControllerState.ENABLED,
@@ -341,5 +355,9 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             assert expected_positions == demand_positions
 
     async def test_standard_state_transitions(self):
-        async with self.make_csc(initial_state=salobj.State.STANDBY, simulation_mode=1):
+        async with self.make_csc(
+            initial_state=salobj.State.STANDBY,
+            simulation_mode=1,
+            config_dir=TEST_CONFIG_DIR,
+        ):
             await self.check_standard_state_transitions(enabled_commands=("move",))
