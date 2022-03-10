@@ -138,9 +138,9 @@ class BaseCsc(salobj.ConfigurableCsc):
         This is provided for unit testing.
     initial_state : `lsst.ts.salobj.State` or `int` (optional)
         The initial state of the CSC.
-    settings_to_apply : `str`, optional
-        Settings to apply if ``initial_state`` is `State.DISABLED`
-        or `State.ENABLED`.
+    override : `str`, optional
+        Configuration override file to apply if ``initial_state`` is
+        `State.DISABLED` or `State.ENABLED`.
     simulation_mode : `int` (optional)
         Simulation mode. Allowed values:
 
@@ -186,7 +186,7 @@ class BaseCsc(salobj.ConfigurableCsc):
         config_schema=None,
         config_dir=None,
         initial_state=salobj.State.STANDBY,
-        settings_to_apply="",
+        override="",
         simulation_mode=0,
     ):
         if initial_state == salobj.State.OFFLINE:
@@ -225,7 +225,7 @@ class BaseCsc(salobj.ConfigurableCsc):
             config_dir=config_dir,
             config_schema=config_schema,
             initial_state=initial_state,
-            settings_to_apply=settings_to_apply,
+            override=override,
             simulation_mode=simulation_mode,
         )
 
@@ -476,7 +476,7 @@ class BaseCsc(salobj.ConfigurableCsc):
         async with self.write_lock:
             await self.client.run_command(command)
 
-    def connect_callback(self, client):
+    async def connect_callback(self, client):
         """Called when the client socket connects or disconnects.
 
         Parameters
@@ -484,12 +484,9 @@ class BaseCsc(salobj.ConfigurableCsc):
         client : `CommandTelemetryClient`
             TCP/IP client.
         """
-        self.evt_connected.set_put(
-            command=client.connected,
-            telemetry=client.connected,
-        )
+        await self.evt_connected.set_write(connected=client.connected)
         if client.should_be_connected and not client.connected:
-            self.fault(
+            await self.fault(
                 code=ErrorCode.CONNECTION_LOST,
                 report="Lost connection to the low-level controller",
             )
@@ -558,11 +555,11 @@ class BaseCsc(salobj.ConfigurableCsc):
             error_code, err_msg = make_connect_error_info(
                 prefix="Timed out", connected=connected, connect_descr=connect_descr
             )
-            self.fault(code=error_code, report=err_msg)
+            await self.fault(code=error_code, report=err_msg)
             raise salobj.ExpectedError(err_msg)
         except ConnectionRefusedError:
             err_msg = f"Connection refused by {connect_descr}"
-            self.fault(code=ErrorCode.CONNECTION_LOST, report=err_msg)
+            await self.fault(code=ErrorCode.CONNECTION_LOST, report=err_msg)
             raise salobj.ExpectedError(err_msg)
         except Exception:
             error_code, err_msg = make_connect_error_info(
@@ -570,7 +567,7 @@ class BaseCsc(salobj.ConfigurableCsc):
                 connected=connected,
                 connect_descr=connect_descr,
             )
-            self.fault(
+            await self.fault(
                 code=error_code, report=err_msg, traceback=traceback.format_exc()
             )
             raise
@@ -671,7 +668,7 @@ class BaseCsc(salobj.ConfigurableCsc):
         return states
 
     @abc.abstractmethod
-    def config_callback(self, client):
+    async def config_callback(self, client):
         """Called when the TCP/IP controller outputs configuration.
 
         Parameters
@@ -681,7 +678,7 @@ class BaseCsc(salobj.ConfigurableCsc):
         """
         raise NotImplementedError()
 
-    def basic_telemetry_callback(self, client):
+    async def basic_telemetry_callback(self, client):
         """Called when the TCP/IP controller outputs telemetry.
 
         Call telemetry_callback, then check the following:
@@ -698,14 +695,14 @@ class BaseCsc(salobj.ConfigurableCsc):
             TCP/IP client.
         """
         try:
-            self.telemetry_callback(client)
+            await self.telemetry_callback(client)
         except Exception:
             self.log.exception("telemetry_callback failed")
         if self.summary_state != salobj.State.ENABLED:
             return
 
         if client.telemetry.state == ControllerState.FAULT:
-            self.fault(
+            await self.fault(
                 code=ErrorCode.CONTROLLER_FAULT,
                 report="Low-level controller went to FAULT state",
             )
@@ -729,7 +726,7 @@ class BaseCsc(salobj.ConfigurableCsc):
             )
 
     @abc.abstractmethod
-    def telemetry_callback(self, client):
+    async def telemetry_callback(self, client):
         """Called when the TCP/IP controller outputs telemetry.
 
         Parameters
@@ -746,12 +743,12 @@ class BaseCsc(salobj.ConfigurableCsc):
 
         Here is a typical implementation::
 
-            self.evt_controllerState.set_put(
+            await self.evt_controllerState.set_write(
                 controllerState=int(client.telemetry.state),
                 offlineSubstate=int(client.telemetry.offline_substate),
                 enabledSubstate=int(client.telemetry.enabled_substate),
             )
-            self.evt_commandableByDDS.set_put(
+            await self.evt_commandableByDDS.set_write(
                 state=bool(
                     client.telemetry.application_status
                     & ApplicationStatus.DDS_COMMAND_SOURCE
