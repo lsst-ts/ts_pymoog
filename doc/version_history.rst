@@ -6,6 +6,23 @@
 Version History
 ###############
 
+v0.30.0
+-------
+
+Changes:
+
+* Only send the CLEAR_ERROR command once, instead of twice with a pause between.
+  This requires ts_hexapod_controller v1.3.2 and ts_rotator_controller v1.4.3.
+* setup.cfg: specify asyncio_mode = auto to eliminate a warning.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 7
+* ts_idl 3.6
+* ts_tcpip 0.1
+* MTRotator IDL file built from ts_xml
+
 v0.29.0
 -------
 

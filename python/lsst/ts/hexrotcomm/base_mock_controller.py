@@ -236,10 +236,9 @@ class BaseMockController(tcpip.OneClientServer, abc.ABC):
         self.set_state(ControllerState.OFFLINE)
 
     async def do_clear_error(self, command):
-        # Allow initial state FAULT and STANDBY because the real controller
-        # requires two sequential CLEAR_COMMAND commands. For the mock
-        # controller the first command will (probably) transition from FAULT
-        # to STANDBY, but the second must be accepted without complaint.
+        # The real low-level controller accepts this command if the
+        # initial state is FAULT or STANDBY. Think of the command as
+        # "clear error if there is one, and if it can be cleared".
         if self.state not in (
             ControllerState.FAULT,
             ControllerState.STANDBY,

@@ -616,32 +616,17 @@ class BaseCsc(salobj.ConfigurableCsc):
             f"Enable low-level controller; initial state={self.client.telemetry.state}"
         )
 
-        states = []
         if self.client.telemetry.state == ControllerState.FAULT:
-            states.append(self.client.telemetry.state)
             # Start by issuing the clearError command.
-            # This must be done twice, with a delay between.
             self.log.info("Clearing low-level controller fault state")
             await self.run_command(
                 code=self.CommandCode.SET_STATE, param1=SetStateParam.CLEAR_ERROR
             )
-            await asyncio.sleep(0.9)
-            await self.run_command(
-                code=self.CommandCode.SET_STATE, param1=SetStateParam.CLEAR_ERROR
-            )
-            # Give the controller time to reset
-            # then check the resulting state
-            await asyncio.sleep(1)
-            if self.client.telemetry.state == ControllerState.FAULT:
-                errmsg = "Cannot clear low-level controller fault state"
-                self.log.error(errmsg)
-                raise salobj.ExpectedError(errmsg)
 
         current_state = self.client.telemetry.state
-        states.append(current_state)
         if current_state == desired_state:
             # we are already in the desired state
-            return states
+            return
 
         command_state_list = _STATE_TRANSITION_DICT[(current_state, desired_state)]
 
@@ -664,8 +649,6 @@ class BaseCsc(salobj.ConfigurableCsc):
                 )
                 self.log.error(errmsg)
                 raise salobj.ExpectedError(errmsg) from e
-            states.append(resulting_state)
-        return states
 
     @abc.abstractmethod
     async def config_callback(self, client):
