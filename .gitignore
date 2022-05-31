@@ -12,6 +12,10 @@ version.py
 # Pytest
 tests/.tests
 pytest_session.txt
-.cache/
+.cache
+.hypothesis
 .pytest_cache
 .coverage
+
+# Editors
+.vscode
