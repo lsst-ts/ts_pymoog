@@ -2,7 +2,7 @@
 ts_hexrotcomm
 #############
 
-Python code to communicate with the main telescope camera rotator and hexapod low level controllers (code running in PXI computers).
+Python code to communicate with the main telescope camera rotator and hexapod low level controllers at Vera C. Rubin Observatory.
 
 `Documentation <https://ts-hexrotcomm.lsst.io>`_
 
