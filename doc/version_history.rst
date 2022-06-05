@@ -6,6 +6,21 @@
 Version History
 ###############
 
+v0.30.1
+-------
+
+Changes:
+
+* Build with pyproject.toml
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 7
+* ts_idl 3.6
+* ts_tcpip 0.1
+* MTRotator IDL file built from ts_xml
+
 v0.30.0
 -------
 

@@ -28,6 +28,7 @@ test:
     - python
     - tests
     - setup.cfg
+    - pyproject.toml
   commands:
     - py.test
 
