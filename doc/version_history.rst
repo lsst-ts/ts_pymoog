@@ -6,10 +6,21 @@
 Version History
 ###############
 
-v0.30.1
+v0.30.2
 -------
 
-Changes:
+* `CommandTelemetryClient`: fix one logging statement.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 7
+* ts_idl 3.6
+* ts_tcpip 0.1
+* MTRotator IDL file built from ts_xml
+
+v0.30.1
+-------
 
 * Build with pyproject.toml
 
@@ -23,8 +34,6 @@ Requires:
 
 v0.30.0
 -------
-
-Changes:
 
 * Only send the CLEAR_ERROR command once, instead of twice with a pause between.
   This requires ts_hexapod_controller v1.3.2 and ts_rotator_controller v1.4.3.
@@ -41,8 +50,6 @@ Requires:
 v0.29.0
 -------
 
-Changes:
-
 * Update for ts_salobj v7, which is required.
   This also requires ts_xml 11.
 
@@ -56,8 +63,6 @@ Requires:
 
 v0.28.1
 -------
-
-Changes:
 
 * Fix enabling of the low-level controller (DM-32902): wait for one telemetry sample after first connecting.
 * `BaseCsc`: eliminate the unused ``wait_summary_state`` method and add some long messages to ``enable_controller``.
@@ -73,8 +78,6 @@ Requires:
 
 v0.28.0
 -------
-
-Changes:
 
 * Update for ts_hexapod_controller 1.3.0 and ts_rotator_controller 1.4.0:
 
@@ -105,8 +108,6 @@ Requires:
 v0.27.0
 -------
 
-Changes:
-
 * `BaseCsc`: remove the ``clearError`` command (which was not supported, but still present in the XML).
   This change requires ts_xml 10.2.
 
@@ -121,8 +122,6 @@ Requires:
 
 v0.26.0
 -------
-
-Changes:
 
 * Updated unit tests for compatibility with ts_salobj 6.8, which is now required.
 * `CONFIG_SCHEMA`: update id link to use `main` instead of `master`.
@@ -139,8 +138,6 @@ Requires:
 
 v0.25.0
 -------
-
-Changes:
 
 * `CommandTelemetryClient` and `CommandTelemetryServer`: support command acknowledgement:
 
@@ -161,8 +158,6 @@ Requires:
 v0.24.0
 -------
 
-Changes:
-
 * `BaseCsc`:
 
     * Go to FAULT state and report error code NO_CONFIG if the low-level controller does not report config shortly after connecting.
@@ -182,8 +177,6 @@ Requires:
 v0.23.1
 -------
 
-Changes:
-
 * `BaseCsc`: go to FAULT state if the CSC cannot connect to the low-level controller.
 * Modernize unit tests to use bare assert.
 
@@ -198,8 +191,6 @@ Requires:
 
 v0.23.0
 -------
-
-Changes:
 
 * Swap client and server, so the client runs in the CSC and the server runs in the mock controller.
   This change requires new versions of the low-level controller code: ts_hexapod_controller and ts_rotator_controller (see ts_mthexapod and ts_mtrotator for details).
@@ -236,8 +227,6 @@ Requires:
 v0.22.0
 -------
 
-Changes:
-
 * Make state transition commands more reliable and more efficient:
   allow more time for the low-level controller to implement the change,
   and stop waiting as soon as the change is reported.
@@ -271,8 +260,6 @@ Deprecations:
 
 * You should obtain the following from ts_tcpip: OneClientServer, close_stream_writer, read_into, write_from, LOCAL_HOST.
   At some point these symbols will no longer be available from ts_hexrotcomm.
-
-Changes:
 
 * Use the new ts_tcpip package.
   Temporarily make the symbols that moved available in lsst.ts.hexrotcomm, for backwards compatibility.
@@ -520,8 +507,6 @@ Backward-incompatible changes:
 * Remove ``BaseCscTestCase`` and ``CscCommander`` classes; use the versions in ts_salobj instead.
 * Bug fix: `BaseCsc.get_config_pkg` returned "ts_config_ocs" instead of "ts_config_mttcs".
 
-Changes:
-
 * Add missing call to ``begin_start`` to `BaseCsc.do_start`.
 * Make `BaseCsc.fault` raise `NotImplementedError`, since the low-level controller maintains the summary state and offers no command to transition to the FAULT state.
 
@@ -535,8 +520,6 @@ Requires:
 v0.7.0
 ======
 
-Changes:
-
 * Make `BaseCsc` a configurable CSC.
 
 Requires:
@@ -548,8 +531,6 @@ Requires:
 
 v0.6.0
 ======
-
-Changes:
 
 * Update for compatibility with ts_salobj 6.
 
@@ -563,8 +544,6 @@ Requires:
 v0.5.2
 ======
 
-Changes:
-
 * Add black to conda test dependencies
 
 Requires:
@@ -576,8 +555,6 @@ Requires:
 
 v0.5.1
 ======
-
-Changes:
 
 * Add ``tests/test_black.py`` to verify that files are formatted with black.
   This requires ts_salobj 5.11 or later.
@@ -595,8 +572,6 @@ Requires:
 v0.5.0
 ======
 
-Changes:
-
 * Make `BaseCsc` forward compatible with ts_xml 5.2 and with explicitly listing which generic topics are used.
 
 Requires:
@@ -608,8 +583,6 @@ Requires:
 
 v0.4.0
 ======
-
-Changes:
 
 * The clearError command in the mock controller now transitions to STANDBY instead of OFFLINE/AVAILABLE.
   This matches a recent change to the rotator controller and a planned change to the hexapod controller.
