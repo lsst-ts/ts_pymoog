@@ -239,7 +239,7 @@ class CommandTelemetryClient:
             self._read_loop_task = asyncio.create_task(self.read_loop())
             await self.call_connect_callback()
         except asyncio.CancelledError:
-            self.debug("connect cancelled")
+            self.log.debug("connect cancelled")
             await self.basic_close()
             raise
         except asyncio.TimeoutError:
