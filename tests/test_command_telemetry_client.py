@@ -90,7 +90,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             log=self.mock_ctrl.log,
             ConfigClass=hexrotcomm.SimpleConfig,
             TelemetryClass=hexrotcomm.SimpleTelemetry,
-            host=tcpip.LOCAL_HOST,
+            host=tcpip.LOCALHOST_IPV4,
             port=self.mock_ctrl.port,
             connect_callback=self.connect_callback,
             config_callback=self.config_callback,
@@ -158,7 +158,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
                     log=self.mock_ctrl.log,
                     ConfigClass=hexrotcomm.SimpleConfig,
                     TelemetryClass=hexrotcomm.SimpleTelemetry,
-                    host=tcpip.LOCAL_HOST,
+                    host=tcpip.LOCALHOST_IPV4,
                     port=self.mock_ctrl.port,
                     **bad_callbacks,
                 )
@@ -354,7 +354,9 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
     async def test_truncate_command_status_reason(self):
         """Test that a too-long command status reason is truncated."""
         reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(host=tcpip.LOCAL_HOST, port=self.mock_ctrl.port),
+            asyncio.open_connection(
+                host=tcpip.LOCALHOST_IPV4, port=self.mock_ctrl.port
+            ),
             timeout=STD_TIMEOUT,
         )
         try:

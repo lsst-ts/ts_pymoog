@@ -172,7 +172,7 @@ class BaseCsc(salobj.ConfigurableCsc):
         Time limit for connection to the low-level controller
 
     Both host and port are ignored in simulation mode; the host is
-    `lsst.ts.tcpip.LOCAL_HOST` and the ports are automatically assigned.
+    `lsst.ts.tcpip.LOCALHOST_IPV4` and the ports are automatically assigned.
     """
 
     def __init__(
@@ -517,7 +517,7 @@ class BaseCsc(salobj.ConfigurableCsc):
         connected = False
         try:
             if self.simulation_mode != 0:
-                host = tcpip.LOCAL_HOST
+                host = tcpip.LOCALHOST_IPV4
                 if self.allow_mock_controller:
                     self.mock_ctrl = self.make_mock_controller(ControllerState.OFFLINE)
                     await self.mock_ctrl.start_task
