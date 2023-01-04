@@ -23,13 +23,7 @@ try:
 except ImportError:
     __version__ = "?"
 
-from lsst.ts.tcpip import (
-    # OneClientServer,
-    close_stream_writer,
-    read_into,
-    write_from,
-    LOCAL_HOST,
-)
+from lsst.ts.tcpip import LOCAL_HOST
 
 from .enums import *
 from .structs import *
