@@ -544,7 +544,7 @@ class BaseCsc(salobj.ConfigurableCsc):
                 telemetry_callback=self.basic_telemetry_callback,
             )
             await asyncio.wait_for(
-                self.client.connect_task, timeout=self.config.connection_timeout
+                self.client.start_task, timeout=self.config.connection_timeout
             )
             connected = True
             # Wait for configuration and telemetry, since we cannot safely

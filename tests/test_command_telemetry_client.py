@@ -32,7 +32,7 @@ from lsst.ts.idl.enums.MTRotator import ControllerState
 from lsst.ts import hexrotcomm
 
 # Standard timeout (seconds)
-STD_TIMEOUT = 5
+STD_TIMEOUT = 1
 
 logging.basicConfig()
 
@@ -96,9 +96,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             config_callback=self.config_callback,
             telemetry_callback=self.telemetry_callback,
         )
-        assert not self.client.should_be_connected
-        await asyncio.wait_for(self.client.connect_task, timeout=STD_TIMEOUT)
-        assert self.client.should_be_connected
+        await asyncio.wait_for(self.client.start_task, timeout=STD_TIMEOUT)
         await self.assert_next_connected(True)
         print(f"client started; port={self.mock_ctrl.port}")
         try:
@@ -175,11 +173,11 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
                 self.client.next_telemetry(), timeout=STD_TIMEOUT
             )
             assert telemetry.cmd_position == self.initial_cmd_position
-            telemetry.curr_position >= self.initial_cmd_position
+            assert telemetry.curr_position >= self.initial_cmd_position
 
-            # extra calls to client.connect should fail
+            # Extra calls to client.start should fail
             with pytest.raises(RuntimeError):
-                await self.client.connect()
+                await self.client.start()
 
     async def test_client_reconnect(self):
         """Test that BaseMockController allows reconnection."""
@@ -227,7 +225,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
                     )
 
             # set position commands should not trigger configuration output.
-            await asyncio.sleep(1)
+            await asyncio.sleep(STD_TIMEOUT)
             assert len(self.config_list) == 1
 
     async def test_bad_frame_id(self):
@@ -239,7 +237,6 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             self.mock_ctrl.telemetry_loop_task.cancel()
             # give the task time to finish; probably not needed
             await asyncio.sleep(0.01)
-            writer = self.mock_ctrl.writer
             self.telemetry_list = []
 
             # Fill a telemetry struct with arbitrary data.
@@ -259,8 +256,8 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             bad_header = hexrotcomm.Header()
             bad_header.frame_id = bad_frame_id
             with self.assertLogs(level=logging.ERROR):
-                await hexrotcomm.write_from(writer, bad_header)
-                await hexrotcomm.write_from(writer, telemetry)
+                await self.mock_ctrl.write_from(bad_header)
+                await self.mock_ctrl.write_from(telemetry)
                 # Give the reader time to read and deal with the message.
                 await asyncio.sleep(STD_TIMEOUT)
             assert len(self.telemetry_list) == 0
@@ -268,8 +265,8 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             # Write a good header and telemetry and test that they are read.
             good_header = hexrotcomm.Header()
             good_header.frame_id = hexrotcomm.FrameId.TELEMETRY
-            await hexrotcomm.write_from(writer, good_header)
-            await hexrotcomm.write_from(writer, telemetry)
+            await self.mock_ctrl.write_from(good_header)
+            await self.mock_ctrl.write_from(telemetry)
             # Give the reader time to read and deal with the message.
             await asyncio.sleep(STD_TIMEOUT)
             assert len(self.telemetry_list) == 1
@@ -303,7 +300,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             # Should fail if command client is not connected
             await self.client.close()
             assert not self.client.connected
-            with pytest.raises(RuntimeError):
+            with pytest.raises(ConnectionError):
                 await self.client.run_command(command)
 
     async def test_failed_callbacks(self):
@@ -321,35 +318,6 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
             await asyncio.wait_for(self.client.next_telemetry(), timeout=STD_TIMEOUT)
             assert len(self.telemetry_list) >= 1
             assert self.client.connected
-
-    async def test_should_be_connected(self):
-        """Test the should_be_connected attribute.
-
-        Note that make_client already checks that should_be_connected
-        is false before making a connection and true after.
-        """
-        async with self.make_client():
-            assert self.client.connected
-            assert self.client.should_be_connected
-
-            # should_be_connected should still be true after basic_close
-            await self.client.basic_close()
-            await self.assert_next_connected(False)
-            assert not self.client.connected
-            assert self.client.should_be_connected
-
-            # should_be_connected should be false after close
-            await self.client.close()
-            assert not self.client.connected
-            assert not self.client.should_be_connected
-
-        # should_be_connected should still be true
-        # if the connection is lost
-        async with self.make_client():
-            await self.mock_ctrl.close_client()
-            await self.assert_next_connected(False)
-            assert not self.client.connected
-            assert self.client.should_be_connected
 
     async def test_truncate_command_status_reason(self):
         """Test that a too-long command status reason is truncated."""
