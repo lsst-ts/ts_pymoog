@@ -6,6 +6,22 @@
 Version History
 ###############
 
+v0.31.0
+-------
+
+* `CommandTelemetryClient`: inherit from `lsst.ts.tcpip.Client`, which requires ts_tcpip 1.0.
+* `BaseMockController`: update to use ts_tcpip 1.0 features in `lsst.ts.tcpip.OneClientServer`.
+* Stop exporting symbols from ts_tcpip, except ``LOCAL_HOST``, which is still used by ts_mtrotator.
+* Make tests/test_command_telemetry_server.py more robust by avoiding asyncTearDown.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 7
+* ts_idl 3.6
+* ts_tcpip 1
+* MTRotator IDL file built from ts_xml
+
 v0.30.2
 -------
 
@@ -209,7 +225,7 @@ v0.23.0
     * The CSC is no longer alive in the OFFLINE state.
     * Update to use `lsst.ts.idl.enums.MTRotator.ErrorCode`, which requires ts_idl 3.4.
 
-* `CommandTelemetryServer`: make the `host` constructor argument optional, with a default of ``tcpip.LOCAL_HOST``.
+* `CommandTelemetryServer`: make the `host` constructor argument optional, with a default of ``tcpip.LOCALHOST_IPV4``.
   Also prohibit constructing with host=None and port=0, to make sure we can determine the randomly chosen ports.
 * Add optional ``host`` constructor argument to `BaseMockController` and `SimpleMockController`.
 * Add a ``Jenkinsfile``.
