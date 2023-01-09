@@ -102,7 +102,7 @@ class BaseMockController(tcpip.OneClientServer, abc.ABC):
         config,
         telemetry,
         port,
-        host=tcpip.LOCAL_HOST,
+        host=tcpip.LOCALHOST_IPV4,
         initial_state=ControllerState.OFFLINE,
     ):
         self.CommandCode = CommandCode
@@ -143,6 +143,9 @@ class BaseMockController(tcpip.OneClientServer, abc.ABC):
             port=port,
             log=log,
             connect_callback=self.connect_callback,
+            # No background monitoring needed, because the mock controller
+            # is almost always reading, and that detects disconnection.
+            monitor_connection_interval=0,
         )
         self.set_state(initial_state)
 
@@ -350,7 +353,7 @@ class BaseMockController(tcpip.OneClientServer, abc.ABC):
         """
         raise NotImplementedError()
 
-    def connect_callback(self, server):
+    async def connect_callback(self, server):
         """Called when the server connection state changes.
 
         If connected: start the command and telemetry loops.
@@ -368,7 +371,7 @@ class BaseMockController(tcpip.OneClientServer, abc.ABC):
         while self.connected:
             try:
                 command = structs.Command()
-                await tcpip.read_into(self.reader, command)
+                await self.read_into(command)
                 try:
                     duration = await self.run_command(command)
                 except CommandError as e:
@@ -394,12 +397,13 @@ class BaseMockController(tcpip.OneClientServer, abc.ABC):
                     )
 
             except asyncio.CancelledError:
-                raise
-            except ConnectionError:
-                self.log.error("Socket closed")
+                # Normal termination
+                pass
+            except (ConnectionError, asyncio.IncompleteReadError):
+                self.log.info("Socket closed")
                 asyncio.create_task(self.close_client())
             except Exception:
-                self.log.exception("command_loop failed")
+                self.log.exception("Command loop failed")
                 asyncio.create_task(self.close_client())
 
     async def close_client(self):
@@ -414,11 +418,10 @@ class BaseMockController(tcpip.OneClientServer, abc.ABC):
         try:
             if self.connected:
                 await self.write_config()
-            # Checking self.writer is not None makes mypy happy
-            while self.connected and self.writer is not None:
+            while self.connected:
                 header, curr_tai = self.update_and_get_header(enums.FrameId.TELEMETRY)
                 await self.update_telemetry(curr_tai=curr_tai)
-                await tcpip.write_from(self.writer, header, self.telemetry)
+                await self.write_from(header, self.telemetry)
                 await asyncio.sleep(self.telemetry_interval)
             self.log.info("Socket disconnected")
         except asyncio.CancelledError:
@@ -458,11 +461,8 @@ class BaseMockController(tcpip.OneClientServer, abc.ABC):
         RuntimeError
             If not connected.
         """
-        # Checking self.writer is not None makes mypy happy
-        if not self.connected or self.writer is None:
-            raise RuntimeError("Not connected")
         header, curr_tai = self.update_and_get_header(enums.FrameId.CONFIG)
-        await tcpip.write_from(self.writer, header, self.config)
+        await self.write_from(header, self.config)
 
     async def write_command_status(self, counter, status, duration=0, reason=""):
         """Write a command status.
@@ -481,12 +481,9 @@ class BaseMockController(tcpip.OneClientServer, abc.ABC):
 
         Raises
         ------
-        RuntimeError
+        ConnectionError
             If not connected.
         """
-        # Checking self.writer is not None makes mypy happy
-        if not self.connected or self.writer is None:
-            raise RuntimeError("Not connected")
         if duration is None:
             duration = 0
         header, curr_tai = self.update_and_get_header(enums.FrameId.COMMAND_STATUS)
@@ -496,4 +493,4 @@ class BaseMockController(tcpip.OneClientServer, abc.ABC):
             duration=duration,
             reason=reason.encode()[0 : structs.COMMAND_STATUS_REASON_LEN],
         )
-        await tcpip.write_from(self.writer, header, command_status)
+        await self.write_from(header, command_status)
