@@ -6,6 +6,20 @@
 Version History
 ###############
 
+v0.31.1
+-------
+
+* pre-commit: update black to 23.1.0, isort to 5.12.0, mypy to 1.0.0, and pre-commit-hooks to v4.4.0.
+* ``Jenkinsfile``: modernize.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 7
+* ts_idl 3.6
+* ts_tcpip 1
+* MTRotator IDL file built from ts_xml
+
 v0.31.0
 -------
 
