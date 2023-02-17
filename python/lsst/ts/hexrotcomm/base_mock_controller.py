@@ -24,15 +24,14 @@ import abc
 import asyncio
 import math
 
-from lsst.ts import tcpip
-from lsst.ts import utils
+from lsst.ts import tcpip, utils
 from lsst.ts.idl.enums.MTRotator import (
     ControllerState,
-    OfflineSubstate,
     EnabledSubstate,
+    OfflineSubstate,
 )
-from . import enums
-from . import structs
+
+from . import enums, structs
 
 
 class CommandError(Exception):

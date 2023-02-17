@@ -21,14 +21,12 @@
 __all__ = ["CommandTelemetryClient"]
 
 import asyncio
-import inspect
 import ctypes
+import inspect
 
-from lsst.ts import utils
-from lsst.ts import salobj
-from lsst.ts import tcpip
-from . import structs
-from . import enums
+from lsst.ts import salobj, tcpip, utils
+
+from . import enums, structs
 
 # Time limit waiting for a command status (second).
 COMMAND_STATUS_TIMEOUT = 5

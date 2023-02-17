@@ -23,7 +23,6 @@ __all__ = ["CONFIG_SCHEMA"]
 
 import yaml
 
-
 # Configuration for SimpleCsc
 CONFIG_SCHEMA = yaml.safe_load(
     """
