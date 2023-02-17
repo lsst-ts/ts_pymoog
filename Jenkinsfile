@@ -1,188 +1,136 @@
-properties(
-    [
-    buildDiscarder
-        (logRotator (
+properties([
+    buildDiscarder(
+        logRotator(
             artifactDaysToKeepStr: '',
             artifactNumToKeepStr: '',
             daysToKeepStr: '14',
-            numToKeepStr: '10'
-        ) ),
-    disableConcurrentBuilds()
-    ]
-)
+            numToKeepStr: '10',
+        )
+    ),
+    // Make new builds terminate existing builds
+    disableConcurrentBuilds(
+        abortPrevious: true,
+    )
+])
 pipeline {
-    agent any
-    environment {
-        network_name = "n_${BUILD_ID}_${JENKINS_NODE_COOKIE}"
-        container_name = "c_${BUILD_ID}_${JENKINS_NODE_COOKIE}"
-        work_branches = "${GIT_BRANCH} ${CHANGE_BRANCH} develop"
-        LSST_IO_CREDS = credentials("lsst-io")
-    }
-
-    stages {
-        stage("Pulling docker image") {
-            steps {
-                script {
-                    sh "docker pull lsstts/salobj:develop"
-                }
-            }
+    agent {
+        // To run on a specific node, e.g. for a specific architecture, add `label '...'`.
+        docker {
+            alwaysPull true
+            image 'lsstts/develop-env:develop'
+            args "--entrypoint=''"
         }
-        stage("Preparing environment") {
+    }
+    environment {
+        // Python module name.
+        MODULE_NAME = 'lsst.ts.hexrotcomm'
+        // Space-separated list of SAL component names for all IDL files required.
+        IDL_NAMES = 'MTRotator'
+        // Product name for documentation upload; the associated
+        // documentation site is `https://{DOC_PRODUCT_NAME}.lsst.io`.
+        DOC_PRODUCT_NAME = 'ts-hexrotcomm'
+
+        WORK_BRANCHES = "${GIT_BRANCH} ${CHANGE_BRANCH} develop"
+        LSST_IO_CREDS = credentials('lsst-io')
+        XML_REPORT_PATH = 'jenkinsReport/report.xml'
+    }
+    stages {
+        stage ('Update branches of required packages') {
             steps {
-                script {
+                // When using the docker container, we need to change the WHOME path
+                // to WORKSPACE to have the authority to install the packages.
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
                     sh """
-                    docker network create \${network_name}
-                    chmod -R a+rw \${WORKSPACE}
-                    container=\$(docker run -v \${WORKSPACE}:/home/saluser/repo/ -td --rm --net \${network_name} -e LTD_USERNAME=\${LSST_IO_CREDS_USR} -e LTD_PASSWORD=\${LSST_IO_CREDS_PSW} --name \${container_name} lsstts/develop-env:develop)
+                        source /home/saluser/.setup_dev.sh || echo "Loading env failed; continuing..."
+
+                        # Update base required packages
+                        cd /home/saluser/repos/ts_idl
+                        /home/saluser/.checkout_repo.sh ${WORK_BRANCHES}
+                        git pull
+
+                        cd /home/saluser/repos/ts_sal
+                        /home/saluser/.checkout_repo.sh ${WORK_BRANCHES}
+                        git pull
+
+                        cd /home/saluser/repos/ts_salobj
+                        /home/saluser/.checkout_repo.sh ${WORK_BRANCHES}
+                        git pull
+
+                        cd /home/saluser/repos/ts_utils
+                        /home/saluser/.checkout_repo.sh ${WORK_BRANCHES}
+                        git pull
+
+                        cd /home/saluser/repos/ts_xml
+                        /home/saluser/.checkout_repo.sh ${WORK_BRANCHES}
+                        git pull
+
+                        # Update additional required packages
+                        cd /home/saluser/repos/ts_tcpip
+                        /home/saluser/.checkout_repo.sh ${WORK_BRANCHES}
+                        git pull
+
+                        # Make IDL files
+                        make_idl_files.py ${env.IDL_NAMES}
                     """
                 }
             }
         }
-        stage("Checkout ts_utils") {
+        stage('Run unit tests') {
             steps {
-                script {
-                    sh "docker exec -u saluser \${container_name} sh -c \"" +
-                        "source ~/.setup.sh && " +
-                        "cd /home/saluser/repos/ts_utils && " +
-                        "/home/saluser/.checkout_repo.sh \${work_branches} && " +
-                        "git pull\""
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
+                    sh """
+                        source /home/saluser/.setup_dev.sh || echo "Loading env failed; continuing..."
+                        setup -r .
+                        pytest --cov-report html --cov=${env.MODULE_NAME} --junitxml=${env.XML_REPORT_PATH}
+                    """
                 }
             }
         }
-        stage("Checkout ts_ddsconfig") {
+        stage('Build documentation') {
             steps {
-                script {
-                    sh "docker exec -u saluser \${container_name} sh -c \"" +
-                        "source ~/.setup.sh && " +
-                        "cd /home/saluser/repos/ts_ddsconfig && " +
-                        "/home/saluser/.checkout_repo.sh \${work_branches} && " +
-                        "git pull\""
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
+                    sh """
+                        source /home/saluser/.setup_dev.sh || echo "Loading env failed; continuing..."
+                        setup -r .
+                        package-docs build
+                    """
                 }
             }
         }
-        stage("Checkout ts_sal") {
+        stage('Try to upload documentation') {
             steps {
-                script {
-                    sh "docker exec -u saluser \${container_name} sh -c \"" +
-                        "source ~/.setup.sh && " +
-                        "cd /home/saluser/repos/ts_sal && " +
-                        "/home/saluser/.checkout_repo.sh \${work_branches} && " +
-                        "git pull\""
-                }
-            }
-        }
-        stage("Checkout ts_xml") {
-            steps {
-                script {
-                    sh "docker exec -u saluser \${container_name} sh -c \"" +
-                        "source ~/.setup.sh && " +
-                        "cd /home/saluser/repos/ts_xml && " +
-                        "/home/saluser/.checkout_repo.sh \${work_branches} && " +
-                        "git pull\""
-                }
-            }
-        }
-        stage("Checkout ts_idl") {
-            steps {
-                script {
-                    sh "docker exec -u saluser \${container_name} sh -c \"" +
-                        "source ~/.setup.sh && " +
-                        "source /home/saluser/.bashrc && " +
-                        "cd /home/saluser/repos/ts_idl && " +
-                        "/home/saluser/.checkout_repo.sh \${work_branches} && " +
-                        "git pull\""
-                }
-            }
-        }
-        stage("Build IDL files") {
-            steps {
-                script {
-                    sh "docker exec -u saluser \${container_name} sh -c \"" +
-                        "source ~/.setup.sh && " +
-                        "source /home/saluser/.bashrc && " +
-                        "make_idl_files.py MTRotator Test\""
-                }
-            }
-        }
-        stage("Checkout ts_salobj") {
-            steps {
-                script {
-                    sh "docker exec -u saluser \${container_name} sh -c \"" +
-                        "source ~/.setup.sh && " +
-                        "source /home/saluser/.bashrc && " +
-                        "cd /home/saluser/repos/ts_salobj && " +
-                        "/home/saluser/.checkout_repo.sh \${work_branches} && " +
-                        "git pull\""
-                }
-            }
-        }
-        stage("Checkout ts_tcpip") {
-            steps {
-                script {
-                    sh "docker exec -u saluser \${container_name} sh -c \"" +
-                        "source ~/.setup.sh && " +
-                        "source /home/saluser/.bashrc && " +
-                        "cd /home/saluser/repos/ts_tcpip && " +
-                        "/home/saluser/.checkout_repo.sh \${work_branches} && " +
-                        "git pull\""
-                }
-            }
-        }
-        stage("Run tests") {
-            steps {
-                script {
-                    sh "docker exec -u saluser \${container_name} sh -c \"" +
-                        "source ~/.setup.sh && " +
-                        "cd /home/saluser/repo/ && " +
-                        "eups declare -r . -t saluser && " +
-                        "setup ts_hexrotcomm -t saluser && " +
-                        "pytest --junitxml=tests/.tests/junit.xml\""
+                withEnv(["WHOME=${env.WORKSPACE}"]) {
+                    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                        sh '''
+                            source /home/saluser/.setup_dev.sh || echo "Loading env failed; continuing..."
+                            setup -r .
+                            ltd -u ${LSST_IO_CREDS_USR} -p ${LSST_IO_CREDS_PSW} upload \
+                                --product ${DOC_PRODUCT_NAME} --git-ref ${GIT_BRANCH} --dir doc/_build/html
+                        '''
+                    }
                 }
             }
         }
     }
     post {
         always {
-            // The path of xml needed by JUnit is relative to
-            // the workspace.
-            junit 'tests/.tests/junit.xml'
+            // The path of xml needed by JUnit is relative to the workspace.
+            junit 'jenkinsReport/*.xml'
 
-            // Publish the HTML report
-            publishHTML (target: [
-                allowMissing: false,
-                alwaysLinkToLastBuild: false,
-                keepAll: true,
-                reportDir: 'tests/.tests/',
-                reportFiles: 'index.html',
-                reportName: "Coverage Report"
-              ])
-
-              sh "docker exec -u saluser \${container_name} sh -c \"" +
-                "source ~/.setup.sh && " +
-                "cd /home/saluser/repo/ && " +
-                "pip install ltd-conveyor && " +
-                "setup ts_hexrotcomm -t saluser && " +
-                "package-docs build\""
-
-            script {
-
-                def RESULT = sh returnStatus: true, script: "docker exec -u saluser \${container_name} sh -c \"" +
-                    "source ~/.setup.sh && " +
-                    "cd /home/saluser/repo/ && " +
-                    "setup ts_hexrotcomm -t saluser && " +
-                    "ltd upload --product ts-hexrotcomm --git-ref \${GIT_BRANCH} --dir doc/_build/html\""
-
-                if ( RESULT != 0 ) {
-                    unstable("Failed to push documentation.")
-                }
-             }
+            // Publish the HTML report.
+            publishHTML (
+                target: [
+                    allowMissing: false,
+                    alwaysLinkToLastBuild: false,
+                    keepAll: true,
+                    reportDir: 'jenkinsReport',
+                    reportFiles: 'index.html',
+                    reportName: "Coverage Report"
+                ]
+            )
         }
         cleanup {
-            sh """
-                docker exec -u root --privileged \${container_name} sh -c \"chmod -R a+rw /home/saluser/repo/ \"
-                docker stop \${container_name} || echo Could not stop container
-                docker network rm \${network_name} || echo Could not remove network
-            """
+            // Clean up the workspace.
             deleteDir()
         }
     }
