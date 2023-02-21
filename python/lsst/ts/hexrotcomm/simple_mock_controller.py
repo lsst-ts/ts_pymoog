@@ -30,9 +30,9 @@ import ctypes
 import enum
 
 from lsst.ts import tcpip
-from lsst.ts.idl.enums.MTRotator import ControllerState, ApplicationStatus
-from .base_mock_controller import BaseMockController, CommandError
+from lsst.ts.idl.enums.MTRotator import ApplicationStatus, ControllerState
 
+from .base_mock_controller import BaseMockController, CommandError
 
 # Default port for the mock controller.
 # This is an arbitrary value chosen to be well away from the telemetry ports

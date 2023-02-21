@@ -24,9 +24,7 @@ import unittest
 import unittest.mock
 
 import pytest
-
-from lsst.ts import salobj
-from lsst.ts import hexrotcomm
+from lsst.ts import hexrotcomm, salobj
 from lsst.ts.idl.enums.MTRotator import (
     ApplicationStatus,
     ControllerState,

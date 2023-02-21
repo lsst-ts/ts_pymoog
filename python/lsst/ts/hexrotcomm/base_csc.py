@@ -26,12 +26,12 @@ import asyncio
 import traceback
 import warnings
 
-from lsst.ts import tcpip
-from lsst.ts import salobj
+from lsst.ts import salobj, tcpip
 from lsst.ts.idl.enums.MTRotator import ControllerState, EnabledSubstate, ErrorCode
-from .enums import SetStateParam
+
 from . import structs
 from .command_telemetry_client import CommandTelemetryClient
+from .enums import SetStateParam
 
 # Maximum number of telemetry messages to read, before deciding that
 # a commanded state change failed.

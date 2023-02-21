@@ -22,13 +22,13 @@ __all__ = ["BaseCscTestCase"]
 
 import contextlib
 
-from lsst.ts.idl.enums.MTRotator import (
-    ControllerState,
-    OfflineSubstate,
-    EnabledSubstate,
-    ApplicationStatus,
-)
 from lsst.ts import salobj
+from lsst.ts.idl.enums.MTRotator import (
+    ApplicationStatus,
+    ControllerState,
+    EnabledSubstate,
+    OfflineSubstate,
+)
 
 # Standard timeout (sec)
 # Long to avoid unnecessary timeouts on slow CI systems.

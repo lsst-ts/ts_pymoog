@@ -21,12 +21,11 @@
 
 __all__ = ["SimpleCsc"]
 
-from lsst.ts import utils
-from lsst.ts import salobj
-from lsst.ts import hexrotcomm
-from lsst.ts.idl.enums.MTRotator import EnabledSubstate, ApplicationStatus
-from .config_schema import CONFIG_SCHEMA
+from lsst.ts import hexrotcomm, salobj, utils
+from lsst.ts.idl.enums.MTRotator import ApplicationStatus, EnabledSubstate
+
 from . import simple_mock_controller
+from .config_schema import CONFIG_SCHEMA
 
 
 class SimpleCsc(hexrotcomm.BaseCsc):
