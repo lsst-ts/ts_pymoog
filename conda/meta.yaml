@@ -31,7 +31,7 @@ test:
     - setup.cfg
     - pyproject.toml
   commands:
-    - py.test
+    - pytest
 
 requirements:
   host:
