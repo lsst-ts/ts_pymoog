@@ -25,11 +25,11 @@ except ImportError:
 
 from lsst.ts.tcpip import LOCAL_HOST
 
-from .enums import *
-from .structs import *
-from .command_telemetry_client import *
-from .base_mock_controller import *
-from .simple_mock_controller import *
 from .base_csc import *
 from .base_csc_test_case import *
+from .base_mock_controller import *
+from .command_telemetry_client import *
+from .enums import *
 from .simple_csc import *
+from .simple_mock_controller import *
+from .structs import *
