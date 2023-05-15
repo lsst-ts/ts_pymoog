@@ -15,3 +15,9 @@ tests/.tests
 
 # Editors
 .vscode
+
+# ts_pre_commit_config
+.pre-commit-config.yaml
+.flake8
+.isort.cfg
+.mypy.ini
