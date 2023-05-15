@@ -6,6 +6,24 @@
 Version History
 ###############
 
+v1.0.0
+------
+
+* `BaseMockController`: inherit from lsst.ts.tcpip.OneClientReadLoopServer.
+  This requires ts_tcpip 1.1.
+* test_command_telemetry_server: use lsst.ts.tcpip.Client instead of asyncio.open_connection (or one test).
+* Use ts_pre_commit_config.
+* ``Jenkinsfile``: use the new shared library.
+* Remove scons support.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 7
+* ts_idl 3.6
+* ts_tcpip 1.1
+* MTRotator IDL file built from ts_xml
+
 v0.31.1
 -------
 
