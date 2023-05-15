@@ -40,7 +40,7 @@ class CommandError(Exception):
     pass
 
 
-class BaseMockController(tcpip.OneClientServer, abc.ABC):
+class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
     """Base class for a mock Moog TCP/IP controller with states.
 
     The controller uses two TCP/IP server sockets,
@@ -142,13 +142,9 @@ class BaseMockController(tcpip.OneClientServer, abc.ABC):
             port=port,
             log=log,
             connect_callback=self.connect_callback,
-            # No background monitoring needed, because the mock controller
-            # is almost always reading, and that detects disconnection.
-            monitor_connection_interval=0,
         )
         self.set_state(initial_state)
 
-        self.command_loop_task = utils.make_done_future()
         self.telemetry_loop_task = utils.make_done_future()
 
     @property
@@ -358,58 +354,42 @@ class BaseMockController(tcpip.OneClientServer, abc.ABC):
         If connected: start the command and telemetry loops.
         If not connected: stop the command and telemetry loops.
         """
-        self.command_loop_task.cancel()
         self.telemetry_loop_task.cancel()
         if self.connected:
-            self.command_loop_task = asyncio.create_task(self.command_loop())
             self.telemetry_loop_task = asyncio.create_task(self.telemetry_loop())
 
-    async def command_loop(self):
-        """Read and execute commands."""
-        self.log.info("command_loop begins")
-        while self.connected:
-            try:
-                command = structs.Command()
-                await self.read_into(command)
-                try:
-                    duration = await self.run_command(command)
-                except CommandError as e:
-                    await self.write_command_status(
-                        counter=command.counter,
-                        status=enums.CommandStatusCode.NO_ACK,
-                        reason=e.args[0],
-                    )
-                except Exception as e:
-                    self.log.exception("Command failed (without raising CommandError)")
-                    await self.write_command_status(
-                        counter=command.counter,
-                        status=enums.CommandStatusCode.NO_ACK,
-                        reason=str(e),
-                    )
-                else:
-                    if duration is None:
-                        duration = 0
-                    await self.write_command_status(
-                        counter=command.counter,
-                        status=enums.CommandStatusCode.ACK,
-                        duration=duration,
-                    )
+    async def read_and_dispatch(self):
+        """Read and execute one command."""
+        command = structs.Command()
+        await self.read_into(command)
+        try:
+            duration = await self.run_command(command)
+        except CommandError as e:
+            await self.write_command_status(
+                counter=command.counter,
+                status=enums.CommandStatusCode.NO_ACK,
+                reason=e.args[0],
+            )
+        except Exception as e:
+            self.log.exception("Command failed (without raising CommandError)")
+            await self.write_command_status(
+                counter=command.counter,
+                status=enums.CommandStatusCode.NO_ACK,
+                reason=str(e),
+            )
+        else:
+            if duration is None:
+                duration = 0
+            await self.write_command_status(
+                counter=command.counter,
+                status=enums.CommandStatusCode.ACK,
+                duration=duration,
+            )
 
-            except asyncio.CancelledError:
-                # Normal termination
-                pass
-            except (ConnectionError, asyncio.IncompleteReadError):
-                self.log.info("Socket closed")
-                asyncio.create_task(self.close_client())
-            except Exception:
-                self.log.exception("Command loop failed")
-                asyncio.create_task(self.close_client())
-
-    async def close_client(self):
+    async def close_client(self, **kwargs):
         """Close the connected client (if any) and stop background tasks."""
-        self.command_loop_task.cancel()
         self.telemetry_loop_task.cancel()
-        await super().close_client()
+        await super().close_client(**kwargs)
 
     async def telemetry_loop(self):
         """Write configuration once, then telemetry at regular intervals."""
