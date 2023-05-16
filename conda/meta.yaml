@@ -8,15 +8,7 @@ source:
 
 build:
   noarch: generic
-  script: python -m pip install --no-deps --ignore-installed .
-  script_env:
-    - PATH
-    - PYTHONPATH
-    - LD_LIBRARY_PATH
-    - OSPL_HOME
-    - PYTHON_BUILD_VERSION
-    - PYTHON_BUILD_LOCATION
-    - LSST_DDS_DOMAIN
+  script: {{ PYTHON }} -m pip install --no-deps --ignore-installed .
 
 test:
   requires:
@@ -28,7 +20,6 @@ test:
   source_files:
     - python
     - tests
-    - setup.cfg
     - pyproject.toml
   commands:
     - pytest
@@ -44,7 +35,6 @@ requirements:
     - python
     - setuptools
     - setuptools_scm
-    - ts-idl
-    - ts-utils
-    - ts-salobj
+    - ts-idl {{ idl_version }}
+    - ts-salobj {{ salobj_version }}
     - ts-tcpip
