@@ -90,7 +90,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
 
     @contextlib.asynccontextmanager
     async def make_client(self, mock_ctrl):
-        """Make a simple controller and wait for it to connect.
+        """Make a CommandTelemetryClient and wait for it to connect.
 
         Parameters
         ----------
@@ -349,55 +349,60 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
 
     async def test_truncate_command_status_reason(self):
         """Test that a too-long command status reason is truncated."""
-        async with self.make_mock_controller() as mock_ctrl:
-            reader, writer = await asyncio.wait_for(
-                asyncio.open_connection(host=tcpip.LOCALHOST_IPV4, port=mock_ctrl.port),
-                timeout=STD_TIMEOUT,
+        async with self.make_mock_controller() as mock_ctrl, tcpip.Client(
+            host=mock_ctrl.host, port=mock_ctrl.port, log=mock_ctrl.log
+        ) as client:
+            await asyncio.wait_for(mock_ctrl.connected_task, timeout=STD_TIMEOUT)
+            reason_len = hexrotcomm.CommandStatus.reason.size
+            assert reason_len > 0
+            command_status = hexrotcomm.CommandStatus()
+            counter = 45
+            status = hexrotcomm.CommandStatusCode.ACK
+            duration = 3.14
+            too_long_reason = "ab" * reason_len
+            too_long_reason_bytes = too_long_reason.encode()
+            await mock_ctrl.write_command_status(
+                counter=counter,
+                status=status,
+                duration=duration,
+                reason=too_long_reason,
             )
-            try:
-                reason_len = hexrotcomm.CommandStatus.reason.size
-                assert reason_len > 0
-                command_status = hexrotcomm.CommandStatus()
-                counter = 45
-                status = hexrotcomm.CommandStatusCode.ACK
-                duration = 3.14
-                too_long_reason = "ab" * reason_len
-                too_long_reason_bytes = too_long_reason.encode()
-                await mock_ctrl.write_command_status(
-                    counter=counter,
-                    status=status,
-                    duration=duration,
-                    reason=too_long_reason,
-                )
 
-                header, command_status = await asyncio.wait_for(
-                    self.next_command_status(reader), timeout=STD_TIMEOUT
-                )
-                assert header.counter == counter
-                assert command_status.status == status
-                assert command_status.duration == duration
-                assert len(command_status.reason) < len(too_long_reason_bytes)
-                assert command_status.reason == too_long_reason_bytes[0:reason_len]
-            finally:
-                await asyncio.wait_for(
-                    tcpip.close_stream_writer(writer), timeout=STD_TIMEOUT
-                )
+            header, command_status = await asyncio.wait_for(
+                self.next_command_status(client), timeout=STD_TIMEOUT
+            )
+            assert header.counter == counter
+            assert command_status.status == status
+            assert command_status.duration == duration
+            assert len(command_status.reason) < len(too_long_reason_bytes)
+            assert command_status.reason == too_long_reason_bytes[0:reason_len]
 
-    async def next_command_status(self, reader):
-        """Read next command status. Reader header and command status."""
+    async def next_command_status(self, client):
+        """Read next command status, ignoring config and telemetry.
+
+        Parameters
+        ----------
+        client : `tcpip.Client`
+            TCP/IP client.
+
+        Returns
+        -------
+        header_cmdstatus : tuple[hexrotcomm.Header, hexrotcomm.CommandStatus]
+            Header and command status.
+        """
         header = hexrotcomm.Header()
         command_status = hexrotcomm.CommandStatus()
         config = hexrotcomm.SimpleConfig()
         telemetry = hexrotcomm.SimpleTelemetry()
         while True:
-            await tcpip.read_into(reader, header)
+            await client.read_into(header)
             if header.frame_id == hexrotcomm.FrameId.COMMAND_STATUS:
-                await tcpip.read_into(reader, command_status)
+                await client.read_into(command_status)
                 return header, command_status
             elif header.frame_id == hexrotcomm.FrameId.CONFIG:
-                await tcpip.read_into(reader, config)
+                await client.read_into(config)
             elif header.frame_id == hexrotcomm.FrameId.TELEMETRY:
-                await tcpip.read_into(reader, telemetry)
+                await client.read_into(telemetry)
             else:
                 raise RuntimeError(f"Unrecognized frame_id: {header.frame_id}")
 
