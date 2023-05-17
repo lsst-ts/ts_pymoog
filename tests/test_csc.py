@@ -321,7 +321,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             # Record demand positions from the `rotation` telemetry topic.
             demand_positions = []
 
-            def rotation_callback(data):
+            async def rotation_callback(data):
                 if data.demandPosition not in demand_positions:
                     demand_positions.append(data.demandPosition)
 
