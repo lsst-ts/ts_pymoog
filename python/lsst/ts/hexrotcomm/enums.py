@@ -49,11 +49,14 @@ class SetStateParam(enum.IntEnum):
     Called ``TriggerCmds`` in the Moog controller.
     """
 
+    # TODO DM-39787: delete START, DISABLE, EXIT, and ENTER_CONTROL
+    # once MTHexapod supports MTRotator's simplified states.
     INVALID = 0
-    START = enum.auto()
-    ENABLE = enum.auto()
-    STANDBY = enum.auto()
-    DISABLE = enum.auto()
-    EXIT = enum.auto()
-    CLEAR_ERROR = enum.auto()
-    ENTER_CONTROL = enum.auto()
+    START = 1
+    ENABLE = 2
+    STANDBY = 3
+    DISABLE = 4
+    EXIT = 5
+    CLEAR_ERROR = 6
+    ENTER_CONTROL = 7
+    FAULT = 8
