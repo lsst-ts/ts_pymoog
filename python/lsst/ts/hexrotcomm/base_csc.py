@@ -63,8 +63,10 @@ def make_connect_error_info(prefix, connected, connect_descr):
     return error_code, err_msg
 
 
+# TODO DM-39787: remove this function once MTHexapod supports
+# MTRotator's simplified states.
 def make_state_transition_dict():
-    """Make a dict of state transition commands and states
+    """Make a dict of state transition commands and states.
 
     This only is used to go from any non-fault starting state
     to enabled state, but in a way it's simpler to just compute
@@ -592,13 +594,6 @@ class BaseCsc(salobj.ConfigurableCsc):
 
     async def enable_controller(self):
         """Enable the low-level controller.
-
-        Returns
-        -------
-        states : `list` [`ControllerState`]
-            A list of the initial controller state, and all controller states
-            this function transitioned the low-level controller through,
-            ending with the ControllerState.ENABLED.
 
         Raises
         ------
