@@ -152,6 +152,8 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
         return self.telemetry.state
 
     @property
+    # TODO DM-39787: remove offline_substate in this whole package,
+    # once MTHexapod supports MTRotator's simplified states.
     def offline_substate(self):
         return self.telemetry.offline_substate
 

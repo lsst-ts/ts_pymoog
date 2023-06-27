@@ -191,6 +191,9 @@ class SimpleCsc(hexrotcomm.BaseCsc):
             timestamp=utils.current_tai(),
         )
 
+    # TODO DM-39787: remove the initial_ctrl_state argument
+    # and always use STANDBY once MTHexapod supports
+    # MTRotator's simplified states.
     def make_mock_controller(self, initial_ctrl_state):
         return simple_mock_controller.SimpleMockController(
             log=self.log,

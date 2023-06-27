@@ -111,6 +111,8 @@ def make_state_transition_dict():
     return state_transition_dict
 
 
+# TODO DM-39787: remove this constant once MTHexapod supports
+# MTRotator's simplified states.
 _STATE_TRANSITION_DICT = make_state_transition_dict()
 
 
@@ -270,6 +272,9 @@ class BaseCsc(salobj.ConfigurableCsc):
         self.config = config
 
     @abc.abstractmethod
+    # TODO DM-39787: remove the initial_ctrl_state argument
+    # and always use STANDBY once MTHexapod supports
+    # MTRotator's simplified states.
     def make_mock_controller(self, initial_ctrl_state):
         """Construct and return a mock controller.
 
@@ -521,6 +526,8 @@ class BaseCsc(salobj.ConfigurableCsc):
             if self.simulation_mode != 0:
                 host = tcpip.LOCALHOST_IPV4
                 if self.allow_mock_controller:
+                    # TODO DM-39787: remove the initial_ctrl_state argument
+                    # once MTHexapod supports MTRotator's simplified states.
                     self.mock_ctrl = self.make_mock_controller(ControllerState.OFFLINE)
                     await self.mock_ctrl.start_task
                     port = self.mock_ctrl.port
@@ -592,6 +599,8 @@ class BaseCsc(salobj.ConfigurableCsc):
                 self.log.exception("disconnect: self.mock_ctrl.close failed")
             self.mock_ctrl = None
 
+    # TODO DM-39787: replace this with the version from RotatorCsc
+    # in ts_mtrotator, once MTHexapod supports MTRotator's simplified states.
     async def enable_controller(self):
         """Enable the low-level controller.
 
@@ -704,6 +713,8 @@ class BaseCsc(salobj.ConfigurableCsc):
             )
 
     @abc.abstractmethod
+    # TODO DM-39787: remove offlineSubstate from the example
+    # once MTHexapod supports MTRotator's simplified states.
     async def telemetry_callback(self, client):
         """Called when the TCP/IP controller outputs telemetry.
 
