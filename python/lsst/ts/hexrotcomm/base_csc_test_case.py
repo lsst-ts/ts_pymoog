@@ -23,7 +23,7 @@ __all__ = ["BaseCscTestCase"]
 import contextlib
 
 from lsst.ts import salobj
-from lsst.ts.idl.enums.MTRotator import (
+from lsst.ts.idl.enums.MTHexapod import (
     ApplicationStatus,
     ControllerState,
     EnabledSubstate,

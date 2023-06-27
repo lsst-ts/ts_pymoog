@@ -30,7 +30,7 @@ import ctypes
 import enum
 
 from lsst.ts import tcpip
-from lsst.ts.idl.enums.MTRotator import ApplicationStatus, ControllerState
+from lsst.ts.idl.enums.MTHexapod import ApplicationStatus, ControllerState
 
 from .base_mock_controller import BaseMockController, CommandError
 

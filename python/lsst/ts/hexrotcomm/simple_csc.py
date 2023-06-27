@@ -22,7 +22,7 @@
 __all__ = ["SimpleCsc"]
 
 from lsst.ts import hexrotcomm, salobj, utils
-from lsst.ts.idl.enums.MTRotator import ApplicationStatus, EnabledSubstate
+from lsst.ts.idl.enums.MTHexapod import ApplicationStatus, EnabledSubstate
 
 from . import simple_mock_controller
 from .config_schema import CONFIG_SCHEMA
@@ -60,9 +60,9 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     -----
     **Error Codes**
 
-    * `lsst.ts.idl.enums.MTRotator.ErrorCode.CONTROLLER_FAULT`:
+    * `lsst.ts.idl.enums.MTHexapod.ErrorCode.CONTROLLER_FAULT`:
       The low-level controller went to fault state.
-    * `lsst.ts.idl.enums.MTRotator.ErrorCode.CONNECTION_LOST`:
+    * `lsst.ts.idl.enums.MTHexapod.ErrorCode.CONNECTION_LOST`:
       Lost connection to the low-level controller.
 
     **SAL API**

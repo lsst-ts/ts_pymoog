@@ -25,7 +25,7 @@ import asyncio
 import math
 
 from lsst.ts import tcpip, utils
-from lsst.ts.idl.enums.MTRotator import (
+from lsst.ts.idl.enums.MTHexapod import (
     ControllerState,
     EnabledSubstate,
     OfflineSubstate,
