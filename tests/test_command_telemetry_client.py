@@ -26,7 +26,7 @@ import unittest
 
 import pytest
 from lsst.ts import hexrotcomm, salobj, tcpip
-from lsst.ts.idl.enums.MTRotator import ControllerState
+from lsst.ts.idl.enums.MTHexapod import ControllerState
 
 # Standard timeout (seconds)
 STD_TIMEOUT = 1

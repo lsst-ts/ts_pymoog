@@ -6,6 +6,22 @@
 Version History
 ###############
 
+v1.1.0
+------
+
+* Support ts_mtrotator using the new simplified low-level controller states:
+
+    * Use ts_idl enums for MTHexapod instead of MTRotator.
+    * Add some TODO notes for future changes, should MTHexapod also adopt the simpler states.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 7
+* ts_idl 3.6
+* ts_tcpip 1.1
+* MTRotator IDL file built from ts_xml
+
 v1.0.0
 ------
 
