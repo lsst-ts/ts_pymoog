@@ -27,7 +27,7 @@ import traceback
 import warnings
 
 from lsst.ts import salobj, tcpip
-from lsst.ts.idl.enums.MTRotator import ControllerState, EnabledSubstate, ErrorCode
+from lsst.ts.idl.enums.MTHexapod import ControllerState, EnabledSubstate, ErrorCode
 
 from . import structs
 from .command_telemetry_client import CommandTelemetryClient
@@ -63,8 +63,10 @@ def make_connect_error_info(prefix, connected, connect_descr):
     return error_code, err_msg
 
 
+# TODO DM-39787: remove this function once MTHexapod supports
+# MTRotator's simplified states.
 def make_state_transition_dict():
-    """Make a dict of state transition commands and states
+    """Make a dict of state transition commands and states.
 
     This only is used to go from any non-fault starting state
     to enabled state, but in a way it's simpler to just compute
@@ -109,6 +111,8 @@ def make_state_transition_dict():
     return state_transition_dict
 
 
+# TODO DM-39787: remove this constant once MTHexapod supports
+# MTRotator's simplified states.
 _STATE_TRANSITION_DICT = make_state_transition_dict()
 
 
@@ -151,9 +155,9 @@ class BaseCsc(salobj.ConfigurableCsc):
     -----
     **Error Codes**
 
-    * `lsst.ts.idl.enums.MTRotator.ErrorCode.CONTROLLER_FAULT`:
+    * `lsst.ts.idl.enums.MTHexapod.ErrorCode.CONTROLLER_FAULT`:
       The low-level controller went to fault state.
-    * `lsst.ts.idl.enums.MTRotator.ErrorCode.CONNECTION_LOST`:
+    * `lsst.ts.idl.enums.MTHexapod.ErrorCode.CONNECTION_LOST`:
       Lost connection to the low-level controller.
 
     Subclasses may add additional error codes.
@@ -268,6 +272,9 @@ class BaseCsc(salobj.ConfigurableCsc):
         self.config = config
 
     @abc.abstractmethod
+    # TODO DM-39787: remove the initial_ctrl_state argument
+    # and always use STANDBY once MTHexapod supports
+    # MTRotator's simplified states.
     def make_mock_controller(self, initial_ctrl_state):
         """Construct and return a mock controller.
 
@@ -519,6 +526,8 @@ class BaseCsc(salobj.ConfigurableCsc):
             if self.simulation_mode != 0:
                 host = tcpip.LOCALHOST_IPV4
                 if self.allow_mock_controller:
+                    # TODO DM-39787: remove the initial_ctrl_state argument
+                    # once MTHexapod supports MTRotator's simplified states.
                     self.mock_ctrl = self.make_mock_controller(ControllerState.OFFLINE)
                     await self.mock_ctrl.start_task
                     port = self.mock_ctrl.port
@@ -590,15 +599,10 @@ class BaseCsc(salobj.ConfigurableCsc):
                 self.log.exception("disconnect: self.mock_ctrl.close failed")
             self.mock_ctrl = None
 
+    # TODO DM-39787: replace this with the version from RotatorCsc
+    # in ts_mtrotator, once MTHexapod supports MTRotator's simplified states.
     async def enable_controller(self):
         """Enable the low-level controller.
-
-        Returns
-        -------
-        states : `list` [`ControllerState`]
-            A list of the initial controller state, and all controller states
-            this function transitioned the low-level controller through,
-            ending with the ControllerState.ENABLED.
 
         Raises
         ------
@@ -709,6 +713,8 @@ class BaseCsc(salobj.ConfigurableCsc):
             )
 
     @abc.abstractmethod
+    # TODO DM-39787: remove offlineSubstate from the example
+    # once MTHexapod supports MTRotator's simplified states.
     async def telemetry_callback(self, client):
         """Called when the TCP/IP controller outputs telemetry.
 

@@ -23,12 +23,7 @@ __all__ = ["BaseCscTestCase"]
 import contextlib
 
 from lsst.ts import salobj
-from lsst.ts.idl.enums.MTRotator import (
-    ApplicationStatus,
-    ControllerState,
-    EnabledSubstate,
-    OfflineSubstate,
-)
+from lsst.ts.idl.enums.MTHexapod import ControllerState
 
 # Standard timeout (sec)
 # Long to avoid unnecessary timeouts on slow CI systems.
@@ -39,11 +34,6 @@ class BaseCscTestCase(salobj.BaseCscTestCase):
     """A variant of salobj.BaseCscTestCase that captures all but the last
     controller state in make_csc.
     """
-
-    ControllerState = ControllerState
-    OfflineSubstate = OfflineSubstate
-    EnabledSubstate = EnabledSubstate
-    ApplicationStatus = ApplicationStatus
 
     @contextlib.asynccontextmanager
     async def make_csc(
