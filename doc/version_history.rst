@@ -6,6 +6,19 @@
 Version History
 ###############
 
+v1.1.1
+------
+
+* Unpin python version in coda recipe.
+
+Requires:
+
+* ts_utils 1
+* ts_salobj 7
+* ts_idl 3.6
+* ts_tcpip 1.1
+* MTRotator IDL file built from ts_xml
+
 v1.1.0
 ------
 
