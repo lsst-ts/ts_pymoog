@@ -6,6 +6,13 @@
 Version History
 ###############
 
+v1.1.2
+------
+
+* Import the enums from **ts_xml** instead of **ts_idl**.
+* Fix the failed tests because the rotator has no **OFFLINE** state anymore.
+* Update the ``.ts_pre_commit_config.yaml``.
+
 v1.1.1
 ------
 
