@@ -23,7 +23,7 @@ __all__ = ["BaseCscTestCase"]
 import contextlib
 
 from lsst.ts import salobj
-from lsst.ts.idl.enums.MTHexapod import ControllerState
+from lsst.ts.xml.enums.MTHexapod import ControllerState
 
 # Standard timeout (sec)
 # Long to avoid unnecessary timeouts on slow CI systems.

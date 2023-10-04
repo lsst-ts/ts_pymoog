@@ -25,7 +25,7 @@ import asyncio
 import math
 
 from lsst.ts import tcpip, utils
-from lsst.ts.idl.enums.MTHexapod import (
+from lsst.ts.xml.enums.MTHexapod import (
     ControllerState,
     EnabledSubstate,
     OfflineSubstate,
@@ -75,7 +75,7 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
         IPV4 and IPV6 servers.
         Do not specify `None` with port=0 (see
         `lsst.ts.tcpip.OneClientServer` for details).
-    initial_state : `lsst.ts.idl.enums.ControllerState` (optional)
+    initial_state : `lsst.ts.xml.enums.MTHexapod.ControllerState` (optional)
         Initial state of mock controller.
 
     Notes
@@ -303,20 +303,20 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
 
         Parameters
         ----------
-        state : `lsst.ts.idl.enums.ControllerState` or `int`
+        state : `lsst.ts.xml.enums.MTHexapod.ControllerState` or `int`
             New state.
 
         Notes
         -----
         Sets the substates as follows:
 
-        * `lsst.ts.idl.enums.OfflineSubstate.AVAILABLE`
-          if state == `lsst.ts.idl.enums.ControllerState.OFFLINE`
-        * `lsst.ts.idl.enums.EnabledSubstate.STATIONARY`
-          if state == `lsst.ts.idl.enums.ControllerState.ENABLED`
+        * `lsst.ts.xml.enums.MTHexapod.OfflineSubstate.AVAILABLE`
+          if state == `lsst.ts.xml.enums.MTHexapod.ControllerState.OFFLINE`
+        * `lsst.ts.xml.enums.MTHexapod.EnabledSubstate.STATIONARY`
+          if state == `lsst.ts.xml.enums.MTHexapod.ControllerState.ENABLED`
 
         The real controller goes to substate
-        `lsst.ts.idl.enums.OfflineSubstate.PUBLISH_ONLY` when going
+        `lsst.ts.xml.enums.MTHexapod.OfflineSubstate.PUBLISH_ONLY` when going
         offline, but requires the engineering user interface (EUI) to get out
         of that state, and we don't have an EUI for the mock controller!
         """
