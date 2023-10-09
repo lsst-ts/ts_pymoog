@@ -30,7 +30,7 @@ import ctypes
 import enum
 
 from lsst.ts import tcpip
-from lsst.ts.idl.enums.MTHexapod import ApplicationStatus, ControllerState
+from lsst.ts.xml.enums.MTHexapod import ApplicationStatus, ControllerState
 
 from .base_mock_controller import BaseMockController, CommandError
 
@@ -69,7 +69,6 @@ class SimpleTelemetry(ctypes.Structure):
         ("application_status", ctypes.c_uint),
         ("state", ctypes.c_double),
         ("enabled_substate", ctypes.c_double),
-        ("offline_substate", ctypes.c_double),
         ("curr_position", ctypes.c_double),
         ("cmd_position", ctypes.c_double),
     ]
@@ -90,7 +89,7 @@ class SimpleMockController(BaseMockController):
         Specify 0 to choose random values for both ports;
         this is recommended for unit tests, to avoid collision
         with other tests.
-    initial_state : `lsst.ts.idl.enums.ControllerState` (optional)
+    initial_state : `lsst.ts.xml.enums.MTHexapod.ControllerState` (optional)
         Initial state of mock controller.
     host : `str` or `None`, optional
         IP address for the TCP/IP server. Typically "127.0.0.1" (the default)

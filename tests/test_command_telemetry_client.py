@@ -26,7 +26,7 @@ import unittest
 
 import pytest
 from lsst.ts import hexrotcomm, salobj, tcpip
-from lsst.ts.idl.enums.MTHexapod import ControllerState
+from lsst.ts.xml.enums.MTHexapod import ControllerState
 
 # Standard timeout (seconds)
 STD_TIMEOUT = 1
@@ -268,7 +268,6 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
                 application_status=5,
                 state=1,
                 enabled_substate=2,
-                offline_substate=3,
                 curr_position=6.3,
                 cmd_position=-15.4,
             )
@@ -299,7 +298,6 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
                 "application_status",
                 "state",
                 "enabled_substate",
-                "offline_substate",
                 "curr_position",
                 "cmd_position",
             ):

@@ -27,7 +27,7 @@ import traceback
 import warnings
 
 from lsst.ts import salobj, tcpip
-from lsst.ts.idl.enums.MTHexapod import ControllerState, EnabledSubstate, ErrorCode
+from lsst.ts.xml.enums.MTHexapod import ControllerState, EnabledSubstate, ErrorCode
 
 from . import structs
 from .command_telemetry_client import CommandTelemetryClient
@@ -155,9 +155,9 @@ class BaseCsc(salobj.ConfigurableCsc):
     -----
     **Error Codes**
 
-    * `lsst.ts.idl.enums.MTHexapod.ErrorCode.CONTROLLER_FAULT`:
+    * `ErrorCode.CONTROLLER_FAULT`:
       The low-level controller went to fault state.
-    * `lsst.ts.idl.enums.MTHexapod.ErrorCode.CONNECTION_LOST`:
+    * `ErrorCode.CONNECTION_LOST`:
       Lost connection to the low-level controller.
 
     Subclasses may add additional error codes.
@@ -322,7 +322,7 @@ class BaseCsc(salobj.ConfigurableCsc):
 
         Parameters
         ----------
-        substate : `lsst.ts.idl.enums.MTHexapod.EnabledSubstate`
+        substate : `EnabledSubstate`
             Substate of low-level controller.
         """
         substate = EnabledSubstate(substate)
@@ -371,7 +371,7 @@ class BaseCsc(salobj.ConfigurableCsc):
 
         Parameters
         ----------
-        state : `lsst.idl.enums.MTRotator.ControllerState`
+        state : `ControllerState`
             Desired controller state.
         max_telem : `int`
             Maximum number of low-level telemetry messages to wait for.

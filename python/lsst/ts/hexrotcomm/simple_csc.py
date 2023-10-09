@@ -22,7 +22,7 @@
 __all__ = ["SimpleCsc"]
 
 from lsst.ts import hexrotcomm, salobj, utils
-from lsst.ts.idl.enums.MTHexapod import ApplicationStatus, EnabledSubstate
+from lsst.ts.xml.enums.MTHexapod import ApplicationStatus, EnabledSubstate
 
 from . import simple_mock_controller
 from .config_schema import CONFIG_SCHEMA
@@ -60,9 +60,9 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     -----
     **Error Codes**
 
-    * `lsst.ts.idl.enums.MTHexapod.ErrorCode.CONTROLLER_FAULT`:
+    * `lsst.ts.xml.enums.MTHexapod.ErrorCode.CONTROLLER_FAULT`:
       The low-level controller went to fault state.
-    * `lsst.ts.idl.enums.MTHexapod.ErrorCode.CONNECTION_LOST`:
+    * `lsst.ts.xml.enums.MTHexapod.ErrorCode.CONNECTION_LOST`:
       Lost connection to the low-level controller.
 
     **SAL API**
@@ -170,12 +170,11 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         client : `CommandTelemetryClient`
             TCP/IP client.
         """
-        # Strangely telemetry.state, offline_substate and enabled_substate
+        # Strangely telemetry.state and enabled_substate
         # are all floats from the controller. But they should only have
         # integer value, so I output them as integers.
         await self.evt_controllerState.set_write(
             controllerState=int(client.telemetry.state),
-            offlineSubstate=int(client.telemetry.offline_substate),
             enabledSubstate=int(client.telemetry.enabled_substate),
         )
         await self.evt_commandableByDDS.set_write(
