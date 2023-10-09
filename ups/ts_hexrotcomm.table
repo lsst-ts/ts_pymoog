@@ -1,6 +1,6 @@
 setupRequired(ts_utils)
 setupRequired(ts_tcpip)
-setupRequired(ts_idl)
+setupRequired(ts_xml)
 setupRequired(ts_salobj)
 
 envPrepend(PATH, ${PRODUCT_DIR}/bin)
