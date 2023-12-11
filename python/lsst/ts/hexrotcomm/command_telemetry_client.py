@@ -23,6 +23,8 @@ __all__ = ["CommandTelemetryClient"]
 import asyncio
 import ctypes
 import inspect
+import logging
+import typing
 
 from lsst.ts import salobj, tcpip, utils
 
@@ -102,16 +104,16 @@ class CommandTelemetryClient(tcpip.Client):
     def __init__(
         self,
         *,
-        log,
-        ConfigClass,
-        TelemetryClass,
-        host,
-        port,
-        connect_callback,
-        config_callback,
-        telemetry_callback,
-        connect_timeout=10,
-    ):
+        log: logging.Logger,
+        ConfigClass: typing.Callable[[], ctypes.Structure],
+        TelemetryClass: typing.Callable[[], ctypes.Structure],
+        host: str,
+        port: int,
+        connect_callback: tcpip.ConnectCallbackType,
+        config_callback: typing.Callable[[typing.Self], typing.Coroutine],
+        telemetry_callback: typing.Callable[[typing.Self], typing.Coroutine],
+        connect_timeout: float = 10.0,
+    ) -> None:
         for arg_name in ("connect_callback", "config_callback", "telemetry_callback"):
             arg_value = locals()[arg_name]
             if not inspect.iscoroutinefunction(arg_value):
@@ -137,11 +139,11 @@ class CommandTelemetryClient(tcpip.Client):
 
         # Task set to None when config is first seen and handled by
         # config_callback, or the exception if config_callback raises.
-        self.configured_task = asyncio.Future()
+        self.configured_task: asyncio.Future = asyncio.Future()
 
         # Task used by next_telemetry to detect when the next telemetry
         # is read.
-        self._telemetry_task = asyncio.Future()
+        self._telemetry_task: asyncio.Future = asyncio.Future()
 
         # Task used to wait for a command acknowledgement
         self._read_command_status_task = utils.make_done_future()
@@ -158,7 +160,7 @@ class CommandTelemetryClient(tcpip.Client):
             log=log,
         )
 
-    async def close(self):
+    async def close(self) -> None:
         """Close the socket connection and cancel all tasks.
 
         Always safe to call.
@@ -169,12 +171,12 @@ class CommandTelemetryClient(tcpip.Client):
         self._telemetry_task.cancel()
         await super().close()
 
-    async def start(self):
+    async def start(self) -> None:
         """Connect to the low-level controller."""
         await super().start()
         self._read_loop_task = asyncio.create_task(self.read_loop())
 
-    async def read_loop(self):
+    async def read_loop(self) -> None:
         """Read from the Moog controller."""
         try:
             # Number of bytes to flush if a header is not recognized.
@@ -221,7 +223,7 @@ class CommandTelemetryClient(tcpip.Client):
                 else:
                     self.log.error(
                         f"Invalid header read: unknown frame_id={self.header.frame_id}; "
-                        f"flushing and continuing. Bytes: {bytes(self.header)}"
+                        f"flushing and continuing. Bytes: {bytes(self.header)!r}"
                     )
                     data = await self.read(max_flush_bytes)
                     self.log.info(f"Flushed {len(data)} bytes")
@@ -235,14 +237,16 @@ class CommandTelemetryClient(tcpip.Client):
             self.log.exception("Unexpected error in read loop.")
         await self.basic_close()
 
-    async def next_telemetry(self):
+    async def next_telemetry(self) -> ctypes.Structure:
         """Wait for next telemetry."""
         if self._telemetry_task.done():
             self._telemetry_task = asyncio.Future()
         await self._telemetry_task
         return self.telemetry
 
-    async def run_command(self, command, interrupt=False):
+    async def run_command(
+        self, command: structs.Command, interrupt: bool = False
+    ) -> float:
         """Run a command and wait for acknowledgement.
 
         Parameters
