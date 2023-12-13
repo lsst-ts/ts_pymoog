@@ -23,13 +23,19 @@ __all__ = ["BaseCsc"]
 
 import abc
 import asyncio
+import ctypes
 import traceback
+import types
+import typing
 import warnings
+from enum import IntEnum
+from pathlib import Path
 
 from lsst.ts import salobj, tcpip
 from lsst.ts.xml.enums.MTHexapod import ControllerState, EnabledSubstate, ErrorCode
 
 from . import structs
+from .base_mock_controller import BaseMockController
 from .command_telemetry_client import CommandTelemetryClient
 from .enums import SetStateParam
 
@@ -42,7 +48,9 @@ MAX_STATE_CHANGE_TELEMETRY_MESSAGES = 5
 CONFIG_TIMEOUT = 10
 
 
-def make_connect_error_info(prefix, connected, connect_descr):
+def make_connect_error_info(
+    prefix: str, connected: bool, connect_descr: str
+) -> tuple[ErrorCode, str]:
     """Make an error code and error message for a connect error.
 
     Parameters
@@ -65,7 +73,7 @@ def make_connect_error_info(prefix, connected, connect_descr):
 
 # TODO DM-39787: remove this function once MTHexapod supports
 # MTRotator's simplified states.
-def make_state_transition_dict():
+def make_state_transition_dict() -> dict[tuple, list]:
     """Make a dict of state transition commands and states.
 
     This only is used to go from any non-fault starting state
@@ -93,7 +101,7 @@ def make_state_transition_dict():
     }
 
     # compute transitions from non-FAULT to all other states
-    state_transition_dict = dict()
+    state_transition_dict: dict = dict()
     for beg_ind, beg_state in enumerate(ordered_states):
         for end_ind, end_state in enumerate(ordered_states):
             if beg_ind == end_ind:
@@ -182,31 +190,31 @@ class BaseCsc(salobj.ConfigurableCsc):
     def __init__(
         self,
         *,
-        name,
-        index,
-        CommandCode,
-        ConfigClass,
-        TelemetryClass,
-        config_schema=None,
-        config_dir=None,
-        initial_state=salobj.State.STANDBY,
-        override="",
-        simulation_mode=0,
-    ):
+        name: str,
+        index: int | None,
+        CommandCode: typing.Callable[[IntEnum], IntEnum],
+        ConfigClass: typing.Callable[[], ctypes.Structure],
+        TelemetryClass: typing.Callable[[], ctypes.Structure],
+        config_schema: dict[str, typing.Any] | None = None,
+        config_dir: str | Path | None = None,
+        initial_state: salobj.State = salobj.State.STANDBY,
+        override: str = "",
+        simulation_mode: int = 0,
+    ) -> None:
         if initial_state == salobj.State.OFFLINE:
             raise ValueError("initial_state = OFFLINE is no longer supported")
-        self.client = None
+        self.client: CommandTelemetryClient | None = None
         self.CommandCode = CommandCode
         self.ConfigClass = ConfigClass
         self.TelemetryClass = TelemetryClass
-        self.mock_ctrl = None
+        self.mock_ctrl: BaseMockController | None = None
 
         # Set this False to simulate failing a connection to the low-level
         # controller, by not starting the mock controller.
         # Ignored unless in simulation mode.
         self.allow_mock_controller = True
 
-        self.config = None
+        self.config: types.SimpleNamespace | None = None
 
         # Lock when writing a message to the low-level controller.
         # You must acquire this lock before cancelling any task
@@ -234,48 +242,56 @@ class BaseCsc(salobj.ConfigurableCsc):
         )
 
     @staticmethod
-    def get_config_pkg():
+    def get_config_pkg() -> str:
         return "ts_config_mttcs"
 
     @property
-    def connected(self):
+    def connected(self) -> bool:
         return self.client is not None and self.client.connected
 
     @property
-    def host(self):
+    def host(self) -> str:
         """Get the TCP/IP address of the low-level controller.
 
         The default implementation returns ``self.config.host``.
         This is not sufficient for the hexapods, which have a different
         host for each of the two hexapods.
         """
+
+        # Workaround the mypy check
+        assert self.config is not None
+
         return self.config.host
 
     @property
-    def port(self):
+    def port(self) -> int:
         """Get the port of the low-level controller.
 
         The default implementation returns ``self.config.port``.
         This is not sufficient for the hexapods, which have a different
         port for each of the two hexapods.
         """
+
+        # Workaround the mypy check
+        assert self.config is not None
+
         return self.config.port
 
-    async def close_tasks(self):
+    async def close_tasks(self) -> None:
         await super().close_tasks()
         if self.mock_ctrl is not None:
             await self.mock_ctrl.close()
         if self.client is not None:
             await self.client.close()
 
-    async def configure(self, config):
+    async def configure(self, config: types.SimpleNamespace) -> None:
         self.config = config
 
     @abc.abstractmethod
     # TODO DM-39787: remove the initial_ctrl_state argument
     # and always use STANDBY once MTHexapod supports
     # MTRotator's simplified states.
-    def make_mock_controller(self, initial_ctrl_state):
+    def make_mock_controller(self, initial_ctrl_state: int) -> None:
         """Construct and return a mock controller.
 
         Parameters
@@ -285,7 +301,7 @@ class BaseCsc(salobj.ConfigurableCsc):
         """
         raise NotImplementedError()
 
-    def assert_commandable(self):
+    def assert_commandable(self) -> None:
         """Assert that CSC is connected to the low-level controller
         and can command it.
         """
@@ -296,7 +312,7 @@ class BaseCsc(salobj.ConfigurableCsc):
                 "use the EUI to enable CSC commands"
             )
 
-    def assert_connected(self):
+    def assert_connected(self) -> None:
         """Assert that the CSC is connected to the low-level controller.
 
         Raises
@@ -307,14 +323,14 @@ class BaseCsc(salobj.ConfigurableCsc):
         if not self.connected:
             raise salobj.ExpectedError("Not connected to the low-level controller.")
 
-    def assert_enabled(self):
+    def assert_enabled(self) -> None:
         """Assert that the CSC is enabled.
 
         First check that CSC can command the low-level controller.
         """
         self.assert_summary_state(salobj.State.ENABLED)
 
-    def assert_enabled_substate(self, substate):
+    def assert_enabled_substate(self, substate: IntEnum) -> None:
         """Assert that the CSC is enabled and that the low-level controller
         is in the specified enabled substate.
 
@@ -327,6 +343,10 @@ class BaseCsc(salobj.ConfigurableCsc):
         """
         substate = EnabledSubstate(substate)
         self.assert_summary_state(salobj.State.ENABLED)
+
+        # Workaround the mypy check
+        assert self.client is not None
+
         if self.client.telemetry.enabled_substate != substate:
             raise salobj.ExpectedError(
                 "Low-level controller in substate "
@@ -334,7 +354,9 @@ class BaseCsc(salobj.ConfigurableCsc):
                 f"instead of {substate!r}"
             )
 
-    def assert_summary_state(self, state, isbefore=None):
+    def assert_summary_state(
+        self, state: salobj.State, isbefore: bool | None = None
+    ) -> None:
         """Assert that the current summary state is as specified.
 
         First check that CSC can command the low-level controller.
@@ -363,8 +385,8 @@ class BaseCsc(salobj.ConfigurableCsc):
             )
 
     async def wait_controller_state(
-        self, state, max_telem=MAX_STATE_CHANGE_TELEMETRY_MESSAGES
-    ):
+        self, state: IntEnum, max_telem: int = MAX_STATE_CHANGE_TELEMETRY_MESSAGES
+    ) -> None:
         """Wait for the controller state to be as specified.
 
         Fails if the CSC cannot command the low-level controller.
@@ -376,6 +398,10 @@ class BaseCsc(salobj.ConfigurableCsc):
         max_telem : `int`
             Maximum number of low-level telemetry messages to wait for.
         """
+
+        # Workaround the mypy check
+        assert self.client is not None
+
         state = ControllerState(state)
         for i in range(max_telem):
             self.assert_connected()
@@ -387,8 +413,15 @@ class BaseCsc(salobj.ConfigurableCsc):
         )
 
     def make_command(
-        self, code, param1=0, param2=0, param3=0, param4=0, param5=0, param6=0
-    ):
+        self,
+        code: IntEnum,
+        param1: float = 0.0,
+        param2: float = 0.0,
+        param3: float = 0.0,
+        param4: float = 0.0,
+        param5: float = 0.0,
+        param6: float = 0.0,
+    ) -> structs.Command:
         """Make a command from the command identifier and keyword arguments.
 
         Used to make commands for `run_multiple_commands`.
@@ -419,15 +452,14 @@ class BaseCsc(salobj.ConfigurableCsc):
 
     async def run_command(
         self,
-        code,
-        param1=0,
-        param2=0,
-        param3=0,
-        param4=0,
-        param5=0,
-        param6=0,
-        verify=None,
-    ):
+        code: IntEnum,
+        param1: float = 0.0,
+        param2: float = 0.0,
+        param3: float = 0.0,
+        param4: float = 0.0,
+        param5: float = 0.0,
+        param6: float = 0.0,
+    ) -> None:
         """Run one command.
 
         Parameters
@@ -437,10 +469,6 @@ class BaseCsc(salobj.ConfigurableCsc):
         param1, param2, param3, param4, param5, param6 : `double`
             Command parameters. The meaning of these parameters
             depends on the command code.
-        verify : `dict` [`str`: `any`] or `None`
-            If a dict: check
-        verify_timeout : `float`
-            Max time for verification (seconds).
         """
         async with self._command_lock:
             command = self.make_command(
@@ -454,7 +482,9 @@ class BaseCsc(salobj.ConfigurableCsc):
             )
             await self.basic_run_command(command)
 
-    async def run_multiple_commands(self, *commands, delay=None):
+    async def run_multiple_commands(
+        self, *commands: list[structs.Command], delay: float | None = None
+    ) -> None:
         """Run multiple commands, without allowing other commands to run
         between them.
 
@@ -468,11 +498,11 @@ class BaseCsc(salobj.ConfigurableCsc):
         """
         async with self._command_lock:
             for command in commands:
-                await self.basic_run_command(command)
+                await self.basic_run_command(command)  # type: ignore[arg-type]
                 if delay is not None:
                     await asyncio.sleep(delay)
 
-    async def basic_run_command(self, command):
+    async def basic_run_command(self, command: structs.Command) -> None:
         """Acquire the write_lock and run the command.
 
         Parameters
@@ -480,10 +510,14 @@ class BaseCsc(salobj.ConfigurableCsc):
         command : `Command`
             Command to run, as constructed by `make_command`.
         """
+
+        # Workaround the mypy check
+        assert self.client is not None
+
         async with self.write_lock:
             await self.client.run_command(command)
 
-    async def connect_callback(self, client):
+    async def connect_callback(self, client: CommandTelemetryClient) -> None:
         """Called when the client socket connects or disconnects.
 
         Parameters
@@ -498,13 +532,13 @@ class BaseCsc(salobj.ConfigurableCsc):
                 report="Lost connection to the low-level controller",
             )
 
-    async def begin_enable(self, data):
+    async def begin_enable(self, data: salobj.BaseMsgType) -> None:
         # Do this before reporting that the CSC is in the enabled state,
         # to prevent basic_telemetry_callback from thinking the low-level
         # controller has gone out of ENABLED state and getting upset.
         await self.enable_controller()
 
-    async def handle_summary_state(self):
+    async def handle_summary_state(self) -> None:
         if self.disabled_or_enabled:
             if not self.connected:
                 await self.connect()
@@ -513,7 +547,7 @@ class BaseCsc(salobj.ConfigurableCsc):
             # so users can see what's going on.
             await self.disconnect()
 
-    async def connect(self):
+    async def connect(self) -> None:
         """Connect to the low-level controller.
 
         After starting the mock controller, if using one.
@@ -529,6 +563,10 @@ class BaseCsc(salobj.ConfigurableCsc):
                     # TODO DM-39787: remove the initial_ctrl_state argument
                     # once MTHexapod supports MTRotator's simplified states.
                     self.mock_ctrl = self.make_mock_controller(ControllerState.OFFLINE)
+
+                    # Workaround the mypy check
+                    assert self.mock_ctrl is not None
+
                     await self.mock_ctrl.start_task
                     port = self.mock_ctrl.port
                 else:
@@ -552,6 +590,11 @@ class BaseCsc(salobj.ConfigurableCsc):
                 config_callback=self.config_callback,
                 telemetry_callback=self.basic_telemetry_callback,
             )
+
+            # Workaround the mypy check
+            assert self.client is not None
+            assert self.config is not None
+
             await asyncio.wait_for(
                 self.client.start_task, timeout=self.config.connection_timeout
             )
@@ -581,13 +624,16 @@ class BaseCsc(salobj.ConfigurableCsc):
             )
             raise
 
-    async def disconnect(self):
+    async def disconnect(self) -> None:
         """Disconnect from the low-level controller.
 
         And shut down the mock controller, if using one.
         """
         if self.connected:
             try:
+                # Workaround the mypy check
+                assert self.client is not None
+
                 await self.client.close()
             except Exception:
                 self.log.exception("disconnect: self.client.close failed")
@@ -601,7 +647,7 @@ class BaseCsc(salobj.ConfigurableCsc):
 
     # TODO DM-39787: replace this with the version from RotatorCsc
     # in ts_mtrotator, once MTHexapod supports MTRotator's simplified states.
-    async def enable_controller(self):
+    async def enable_controller(self) -> None:
         """Enable the low-level controller.
 
         Raises
@@ -616,6 +662,9 @@ class BaseCsc(salobj.ConfigurableCsc):
         # Desired controller state
         desired_state = ControllerState.ENABLED
 
+        # Workaround the mypy check
+        assert self.client is not None
+
         self.log.info(
             f"Enable low-level controller; initial state={self.client.telemetry.state}"
         )
@@ -624,7 +673,8 @@ class BaseCsc(salobj.ConfigurableCsc):
             # Start by issuing the clearError command.
             self.log.info("Clearing low-level controller fault state")
             await self.run_command(
-                code=self.CommandCode.SET_STATE, param1=SetStateParam.CLEAR_ERROR
+                code=self.CommandCode.SET_STATE,  # type: ignore[attr-defined]
+                param1=SetStateParam.CLEAR_ERROR,
             )
 
         current_state = self.client.telemetry.state
@@ -639,7 +689,7 @@ class BaseCsc(salobj.ConfigurableCsc):
             try:
                 self.log.debug(f"Issue SET_STATE command with param1={command_param!r}")
                 await self.run_command(
-                    code=self.CommandCode.SET_STATE, param1=command_param
+                    code=self.CommandCode.SET_STATE, param1=command_param  # type: ignore[attr-defined]
                 )
                 # Waiting for the controller state is not necessary, but it
                 # makes sure that the CSC publishes all intermediate
@@ -655,7 +705,7 @@ class BaseCsc(salobj.ConfigurableCsc):
                 raise salobj.ExpectedError(errmsg) from e
 
     @abc.abstractmethod
-    async def config_callback(self, client):
+    async def config_callback(self, client: CommandTelemetryClient) -> None:
         """Called when the TCP/IP controller outputs configuration.
 
         Parameters
@@ -665,7 +715,7 @@ class BaseCsc(salobj.ConfigurableCsc):
         """
         raise NotImplementedError()
 
-    async def basic_telemetry_callback(self, client):
+    async def basic_telemetry_callback(self, client: CommandTelemetryClient) -> None:
         """Called when the TCP/IP controller outputs telemetry.
 
         Call telemetry_callback, then check the following:
@@ -715,7 +765,7 @@ class BaseCsc(salobj.ConfigurableCsc):
     @abc.abstractmethod
     # TODO DM-39787: remove offlineSubstate from the example
     # once MTHexapod supports MTRotator's simplified states.
-    async def telemetry_callback(self, client):
+    async def telemetry_callback(self, client: CommandTelemetryClient) -> None:
         """Called when the TCP/IP controller outputs telemetry.
 
         Parameters

@@ -22,7 +22,11 @@ __all__ = ["BaseMockController"]
 
 import abc
 import asyncio
+import ctypes
+import logging
 import math
+import typing
+from enum import IntEnum
 
 from lsst.ts import tcpip, utils
 from lsst.ts.xml.enums.MTHexapod import (
@@ -95,32 +99,38 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
 
     def __init__(
         self,
-        log,
-        CommandCode,
-        extra_commands,
-        config,
-        telemetry,
-        port,
-        host=tcpip.LOCALHOST_IPV4,
-        initial_state=ControllerState.OFFLINE,
-    ):
+        log: logging.Logger,
+        CommandCode: typing.Callable[[IntEnum], IntEnum],
+        extra_commands: dict[typing.Any, typing.Callable],
+        config: ctypes.Structure,
+        telemetry: ctypes.Structure,
+        port: int,
+        host: str | None = tcpip.LOCALHOST_IPV4,
+        initial_state: IntEnum = ControllerState.OFFLINE,
+    ) -> None:
         self.CommandCode = CommandCode
         self.config = config
         self.telemetry = telemetry
 
         # Dict of command key: command
         self.command_table = {
-            (CommandCode.SET_STATE, enums.SetStateParam.START): self.do_start,
-            (CommandCode.SET_STATE, enums.SetStateParam.ENABLE): self.do_enable,
-            (CommandCode.SET_STATE, enums.SetStateParam.STANDBY): self.do_standby,
-            (CommandCode.SET_STATE, enums.SetStateParam.DISABLE): self.do_disable,
-            (CommandCode.SET_STATE, enums.SetStateParam.EXIT): self.do_exit,
+            (CommandCode.SET_STATE, enums.SetStateParam.START): self.do_start,  # type: ignore[attr-defined]
+            (CommandCode.SET_STATE, enums.SetStateParam.ENABLE): self.do_enable,  # type: ignore[attr-defined]
             (
-                CommandCode.SET_STATE,
+                CommandCode.SET_STATE,  # type: ignore[attr-defined]
+                enums.SetStateParam.STANDBY,
+            ): self.do_standby,
+            (
+                CommandCode.SET_STATE,  # type: ignore[attr-defined]
+                enums.SetStateParam.DISABLE,
+            ): self.do_disable,
+            (CommandCode.SET_STATE, enums.SetStateParam.EXIT): self.do_exit,  # type: ignore[attr-defined]
+            (
+                CommandCode.SET_STATE,  # type: ignore[attr-defined]
                 enums.SetStateParam.CLEAR_ERROR,
             ): self.do_clear_error,
             (
-                CommandCode.SET_STATE,
+                CommandCode.SET_STATE,  # type: ignore[attr-defined]
                 enums.SetStateParam.ENTER_CONTROL,
             ): self.do_enter_control,
         }
@@ -148,35 +158,40 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
         self.telemetry_loop_task = utils.make_done_future()
 
     @property
-    def state(self):
+    def state(self) -> int:
         return self.telemetry.state
 
     @property
     # TODO DM-39787: remove offline_substate in this whole package,
     # once MTHexapod supports MTRotator's simplified states.
-    def offline_substate(self):
+    def offline_substate(self) -> int:
         return self.telemetry.offline_substate
 
     @property
-    def enabled_substate(self):
+    def enabled_substate(self) -> int:
         return self.telemetry.enabled_substate
 
-    def assert_stationary(self):
+    def assert_stationary(self) -> None:
         self.assert_state(
             ControllerState.ENABLED,
             enabled_substate=EnabledSubstate.STATIONARY,
         )
 
-    def get_command_key(self, command):
+    def get_command_key(self, command: structs.Command) -> typing.Any:
         """Return the key to command_table."""
         if command.code in (
-            self.CommandCode.SET_STATE,
-            self.CommandCode.SET_ENABLED_SUBSTATE,
+            self.CommandCode.SET_STATE,  # type: ignore[attr-defined]
+            self.CommandCode.SET_ENABLED_SUBSTATE,  # type: ignore[attr-defined]
         ):
-            return (command.code, int(command.param1))
+            return (command.code, int(command.param1))  # type: ignore[attr-defined]
         return command.code
 
-    def assert_state(self, state, offline_substate=None, enabled_substate=None):
+    def assert_state(
+        self,
+        state: int,
+        offline_substate: int | None = None,
+        enabled_substate: int | None = None,
+    ) -> None:
         """Check the state and, optionally, the substate.
 
         Parameters
@@ -208,34 +223,34 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
                 f"must be {enabled_substate!r} for this command."
             )
 
-    async def do_enter_control(self, command):
+    async def do_enter_control(self, command: structs.Command) -> None:
         self.assert_state(
             ControllerState.OFFLINE,
             offline_substate=OfflineSubstate.AVAILABLE,
         )
         self.set_state(ControllerState.STANDBY)
 
-    async def do_start(self, command):
+    async def do_start(self, command: structs.Command) -> None:
         self.assert_state(ControllerState.STANDBY)
         self.set_state(ControllerState.DISABLED)
 
-    async def do_enable(self, command):
+    async def do_enable(self, command: structs.Command) -> None:
         self.assert_state(ControllerState.DISABLED)
         self.set_state(ControllerState.ENABLED)
 
-    async def do_disable(self, command):
+    async def do_disable(self, command: structs.Command) -> None:
         self.assert_state(ControllerState.ENABLED)
         self.set_state(ControllerState.DISABLED)
 
-    async def do_standby(self, command):
+    async def do_standby(self, command: structs.Command) -> None:
         self.assert_state(ControllerState.DISABLED)
         self.set_state(ControllerState.STANDBY)
 
-    async def do_exit(self, command):
+    async def do_exit(self, command: structs.Command) -> None:
         self.assert_state(ControllerState.STANDBY)
         self.set_state(ControllerState.OFFLINE)
 
-    async def do_clear_error(self, command):
+    async def do_clear_error(self, command: structs.Command) -> None:
         # The real low-level controller accepts this command if the
         # initial state is FAULT or STANDBY. Think of the command as
         # "clear error if there is one, and if it can be cleared".
@@ -248,7 +263,7 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
             )
         self.set_state(ControllerState.STANDBY)
 
-    async def run_command(self, command):
+    async def run_command(self, command: structs.Command) -> float | None:
         """Run a command and wait for the reply.
 
         Parameters
@@ -259,7 +274,7 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
 
         Returns
         -------
-        duration : `float`
+        duration : `float` or None
             Estimated duration (seconds) until the command is finished.
             0 if the command is already done or almost already done.
 
@@ -286,19 +301,23 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
                 f"Unrecognized command code {command.code}; param1={command.param1}..."
             )
             return
-        duration = await cmd_method(command)
-        await self.end_run_command(command=command, cmd_method=cmd_method)
+
+        duration = await cmd_method(command)  # type: ignore[arg-type, func-returns-value]
+        await self.end_run_command(command=command, cmd_method=cmd_method)  # type: ignore[arg-type]
+
         return duration
 
     @abc.abstractmethod
-    async def end_run_command(self, command, cmd_method):
+    async def end_run_command(
+        self, command: structs.Command, cmd_method: typing.Coroutine
+    ) -> None:
         """Called when run_command is done.
 
         Can be used to clear the set position.
         """
         raise NotImplementedError()
 
-    def set_state(self, state):
+    def set_state(self, state: IntEnum) -> None:
         """Set the current state and substates.
 
         Parameters
@@ -338,7 +357,7 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
         )
 
     @abc.abstractmethod
-    async def update_telemetry(self, curr_tai):
+    async def update_telemetry(self, curr_tai: float) -> None:
         """Update self.client.telemetry.
 
         Parameters
@@ -350,7 +369,7 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
         """
         raise NotImplementedError()
 
-    async def connect_callback(self, server):
+    async def connect_callback(self, server: tcpip.OneClientReadLoopServer) -> None:
         """Called when the server connection state changes.
 
         If connected: start the command and telemetry loops.
@@ -360,7 +379,7 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
         if self.connected:
             self.telemetry_loop_task = asyncio.create_task(self.telemetry_loop())
 
-    async def read_and_dispatch(self):
+    async def read_and_dispatch(self) -> None:
         """Read and execute one command."""
         command = structs.Command()
         await self.read_into(command)
@@ -388,12 +407,12 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
                 duration=duration,
             )
 
-    async def close_client(self, **kwargs):
+    async def close_client(self, **kwargs: dict[str, typing.Any]) -> None:
         """Close the connected client (if any) and stop background tasks."""
         self.telemetry_loop_task.cancel()
         await super().close_client(**kwargs)
 
-    async def telemetry_loop(self):
+    async def telemetry_loop(self) -> None:
         """Write configuration once, then telemetry at regular intervals."""
         self.log.info("telemetry_loop begins")
         try:
@@ -410,14 +429,16 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
         except Exception:
             self.log.exception("telemetry_loop failed")
 
-    def update_and_get_header(self, frame_id):
+    def update_and_get_header(
+        self, frame_id: enums.FrameId
+    ) -> tuple[structs.Header, float]:
         """Update the config or telemetry header and return it and the time.
 
         Call this prior to writing configuration or telemetry.
 
         Parameters
         ----------
-        frame_id : `int`
+        frame_id : `FrameId`
             Frame ID of header to write.
 
         Returns
@@ -434,7 +455,7 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
         header.tai_nsec = int(tai_frac * 1e9)
         return header, curr_tai
 
-    async def write_config(self):
+    async def write_config(self) -> None:
         """Write the current configuration.
 
         Raises
@@ -445,7 +466,13 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
         header, curr_tai = self.update_and_get_header(enums.FrameId.CONFIG)
         await self.write_from(header, self.config)
 
-    async def write_command_status(self, counter, status, duration=0, reason=""):
+    async def write_command_status(
+        self,
+        counter: int,
+        status: enums.CommandStatusCode,
+        duration: float | None = 0.0,
+        reason: str = "",
+    ) -> None:
         """Write a command status.
 
         Parameters

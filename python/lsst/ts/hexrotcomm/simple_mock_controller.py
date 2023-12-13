@@ -28,10 +28,13 @@ __all__ = [
 
 import ctypes
 import enum
+import logging
+import typing
 
 from lsst.ts import tcpip
 from lsst.ts.xml.enums.MTHexapod import ApplicationStatus, ControllerState
 
+from . import structs
 from .base_mock_controller import BaseMockController, CommandError
 
 # Default port for the mock controller.
@@ -107,11 +110,11 @@ class SimpleMockController(BaseMockController):
 
     def __init__(
         self,
-        log,
-        port=SIMPLE_TELEMETRY_PORT,
-        host=tcpip.LOCAL_HOST,
-        initial_state=ControllerState.OFFLINE,
-    ):
+        log: logging.Logger,
+        port: int = SIMPLE_TELEMETRY_PORT,
+        host: str = tcpip.LOCAL_HOST,
+        initial_state: enum.IntEnum = ControllerState.OFFLINE,
+    ) -> None:
         config = SimpleConfig()
         config.min_position = -25
         config.max_position = 25
@@ -130,7 +133,7 @@ class SimpleMockController(BaseMockController):
         )
         self.telemetry.application_status = ApplicationStatus.DDS_COMMAND_SOURCE
 
-    async def do_position_set(self, command):
+    async def do_position_set(self, command: structs.Command) -> None:
         self.assert_state(ControllerState.ENABLED)
         position = command.param1
         if position < self.config.min_position or position > self.config.max_position:
@@ -141,13 +144,15 @@ class SimpleMockController(BaseMockController):
         self.telemetry.cmd_position = position
         self.telemetry.curr_position = position
 
-    async def update_telemetry(self, curr_tai):
+    async def update_telemetry(self, curr_tai: float) -> None:
         self.telemetry.curr_position += 0.001
 
-    async def end_run_command(self, **kwargs):
+    async def end_run_command(
+        self, command: structs.Command, cmd_method: typing.Coroutine
+    ) -> None:
         pass
 
-    async def write_config(self):
+    async def write_config(self) -> None:
         if ENABLE_CONFIG:
             await super().write_config()
         else:

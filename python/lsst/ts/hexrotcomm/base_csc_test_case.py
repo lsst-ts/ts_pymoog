@@ -21,6 +21,8 @@
 __all__ = ["BaseCscTestCase"]
 
 import contextlib
+import pathlib
+import typing
 
 from lsst.ts import salobj
 from lsst.ts.xml.enums.MTHexapod import ControllerState
@@ -38,13 +40,13 @@ class BaseCscTestCase(salobj.BaseCscTestCase):
     @contextlib.asynccontextmanager
     async def make_csc(
         self,
-        initial_state=salobj.State.STANDBY,
-        config_dir=None,
-        simulation_mode=0,
-        log_level=None,
-        timeout=STD_TIMEOUT,
-        **kwargs,
-    ):
+        initial_state: salobj.State = salobj.State.STANDBY,
+        config_dir: str | pathlib.Path | None = None,
+        simulation_mode: int = 0,
+        log_level: int | None = None,
+        timeout: float = STD_TIMEOUT,
+        **kwargs: dict[str, typing.Any],
+    ) -> salobj.BaseCsc:
         """Create a CSC and remote and wait for them to start.
 
         The csc is accessed as ``self.csc`` and the remote as ``self.remote``.
@@ -104,7 +106,9 @@ class BaseCscTestCase(salobj.BaseCscTestCase):
                     )
             yield
 
-    async def check_bin_script(self, name, index, exe_name, cmdline_args=()):
+    async def check_bin_script(
+        self, name: str, index: int | None, exe_name: str, cmdline_args: list[str] = []
+    ) -> None:
         """Test running the CSC command line script.
 
         Parameters

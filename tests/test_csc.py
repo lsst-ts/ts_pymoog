@@ -38,14 +38,19 @@ TEST_CONFIG_DIR = pathlib.Path(__file__).parent / "data" / "config"
 
 
 class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase):
-    def basic_make_csc(self, config_dir, initial_state, simulation_mode):
+    def basic_make_csc(
+        self,
+        config_dir: str | pathlib.Path,
+        initial_state: salobj.State,
+        simulation_mode: int,
+    ) -> hexrotcomm.SimpleCsc:
         return hexrotcomm.SimpleCsc(
             initial_state=initial_state,
             simulation_mode=simulation_mode,
             config_dir=config_dir,
         )
 
-    async def test_constructor_errors(self):
+    async def test_constructor_errors(self) -> None:
         for bad_initial_state in (0, salobj.State.OFFLINE, max(salobj.State) + 1):
             with pytest.raises(ValueError):
                 hexrotcomm.SimpleCsc(
@@ -80,7 +85,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
                     simulation_mode=0,
                 )
 
-    async def test_invalid_config(self):
+    async def test_invalid_config(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             simulation_mode=1,
@@ -103,7 +108,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             )
             assert self.csc.summary_state == salobj.State.DISABLED
 
-    async def test_controller_fault(self):
+    async def test_controller_fault(self) -> None:
         """Controller going to fault should send CSC to fault, error code 1"""
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
@@ -128,7 +133,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
                 topic=self.remote.evt_errorCode, errorCode=ErrorCode.CONTROLLER_FAULT
             )
 
-    async def test_cannot_connect(self):
+    async def test_cannot_connect(self) -> None:
         """Being unable to connect should send CSC to fault state.
 
         The error code should be ErrorCode.CONNECTION_LOST
@@ -152,7 +157,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
                 topic=self.remote.evt_errorCode, errorCode=ErrorCode.CONNECTION_LOST
             )
 
-    async def test_no_config(self):
+    async def test_no_config(self) -> None:
         short_config_timeout = 1
         with unittest.mock.patch(
             "lsst.ts.hexrotcomm.base_csc.CONFIG_TIMEOUT", short_config_timeout
@@ -181,7 +186,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
                 )
                 assert "Timed out" in data.errorReport
 
-    async def test_lose_connection(self):
+    async def test_lose_connection(self) -> None:
         """Losing the connection should send CSC to fault state.
 
         The error code should be ErrorCode.CONNECTION_LOST
@@ -211,7 +216,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             await self.remote.cmd_standby.start(timeout=STD_TIMEOUT)
             await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
 
-    async def test_controller_not_enabled(self):
+    async def test_controller_not_enabled(self) -> None:
         """Controller going out of enabled state should disable the CSC"""
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
@@ -232,7 +237,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             )
             await self.assert_next_summary_state(salobj.State.DISABLED)
 
-    async def test_eui_takes_control(self):
+    async def test_eui_takes_control(self) -> None:
         """If the EUI takes control this should disable the CSC"""
         async with self.make_csc(
             initial_state=salobj.State.ENABLED,
@@ -260,7 +265,9 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             )
             await self.assert_next_summary_state(salobj.State.DISABLED)
 
-    async def move_sequentially(self, *positions, delay=None):
+    async def move_sequentially(
+        self, *positions: list[float], delay: float | None = None
+    ) -> None:
         """Move sequentially to different positions, in order to test
         `BaseCsc.run_multiple_commands`.
 
@@ -283,7 +290,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             commands.append(command)
         await self.csc.run_multiple_commands(*commands, delay=delay)
 
-    async def test_move(self):
+    async def test_move(self) -> None:
         """Test the move command."""
         destination = 2  # a small move so the test runs quickly
         async with self.make_csc(
@@ -304,7 +311,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             data = await self.remote.tel_rotation.next(flush=True, timeout=STD_TIMEOUT)
             assert data.demandPosition == pytest.approx(destination)
 
-    async def test_run_multiple_commands(self):
+    async def test_run_multiple_commands(self) -> None:
         """Test BaseCsc.run_multiple_commands."""
         target_positions = (1, 2, 3)  # Small moves so the test runs quickly
         async with self.make_csc(
@@ -321,7 +328,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             # Record demand positions from the `rotation` telemetry topic.
             demand_positions = []
 
-            async def rotation_callback(data):
+            async def rotation_callback(data: salobj.BaseMsgType) -> None:
                 if data.demandPosition not in demand_positions:
                     demand_positions.append(data.demandPosition)
 
@@ -332,7 +339,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
 
             # Start moving to the specified positions
             task1 = asyncio.ensure_future(
-                self.move_sequentially(*target_positions, delay=telemetry_delay)
+                self.move_sequentially(*target_positions, delay=telemetry_delay)  # type: ignore[arg-type]
             )
             # Give this task a chance to start running
             await asyncio.sleep(0.01)
@@ -352,7 +359,7 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             expected_positions = [0] + list(target_positions) + [other_move.position]
             assert expected_positions == demand_positions
 
-    async def test_standard_state_transitions(self):
+    async def test_standard_state_transitions(self) -> None:
         async with self.make_csc(
             initial_state=salobj.State.STANDBY,
             simulation_mode=1,

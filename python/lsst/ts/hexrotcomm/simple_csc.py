@@ -21,10 +21,14 @@
 
 __all__ = ["SimpleCsc"]
 
+from enum import IntEnum
+from pathlib import Path
+
 from lsst.ts import hexrotcomm, salobj, utils
 from lsst.ts.xml.enums.MTHexapod import ApplicationStatus, EnabledSubstate
 
 from . import simple_mock_controller
+from .command_telemetry_client import CommandTelemetryClient
 from .config_schema import CONFIG_SCHEMA
 
 
@@ -90,11 +94,11 @@ class SimpleCsc(hexrotcomm.BaseCsc):
 
     def __init__(
         self,
-        config_dir=None,
-        initial_state=salobj.State.STANDBY,
-        simulation_mode=1,
-        override="",
-    ):
+        config_dir: str | Path | None = None,
+        initial_state: salobj.State = salobj.State.STANDBY,
+        simulation_mode: int = 1,
+        override: str = "",
+    ) -> None:
         super().__init__(
             name="MTRotator",
             index=0,
@@ -108,7 +112,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
             simulation_mode=simulation_mode,
         )
 
-    async def do_move(self, data):
+    async def do_move(self, data: salobj.BaseMsgType) -> None:
         """Specify a position."""
         self.assert_enabled_substate(EnabledSubstate.STATIONARY)
         if (
@@ -125,25 +129,25 @@ class SimpleCsc(hexrotcomm.BaseCsc):
             code=simple_mock_controller.SimpleCommandCode.MOVE, param1=data.position
         )
 
-    async def do_configureAcceleration(self, data):
+    async def do_configureAcceleration(self, data: salobj.BaseMsgType) -> None:
         raise salobj.ExpectedError("Not implemented")
 
-    async def do_configureVelocity(self, data):
+    async def do_configureVelocity(self, data: salobj.BaseMsgType) -> None:
         raise salobj.ExpectedError("Not implemented")
 
-    async def do_fault(self, data):
+    async def do_fault(self, data: salobj.BaseMsgType) -> None:
         raise salobj.ExpectedError("Not implemented")
 
-    async def do_stop(self, data):
+    async def do_stop(self, data: salobj.BaseMsgType) -> None:
         raise salobj.ExpectedError("Not implemented")
 
-    async def do_track(self, data):
+    async def do_track(self, data: salobj.BaseMsgType) -> None:
         raise salobj.ExpectedError("Not implemented")
 
-    async def do_trackStart(self, data):
+    async def do_trackStart(self, data: salobj.BaseMsgType) -> None:
         raise salobj.ExpectedError("Not implemented")
 
-    async def config_callback(self, client):
+    async def config_callback(self, client: CommandTelemetryClient) -> None:
         """Called when the TCP/IP controller outputs configuration.
 
         Parameters
@@ -162,7 +166,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         )
         await self.evt_commandableByDDS.set_write(state=True)
 
-    async def telemetry_callback(self, client):
+    async def telemetry_callback(self, client: CommandTelemetryClient) -> None:
         """Called when the TCP/IP controller outputs telemetry.
 
         Parameters
@@ -193,7 +197,9 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     # TODO DM-39787: remove the initial_ctrl_state argument
     # and always use STANDBY once MTHexapod supports
     # MTRotator's simplified states.
-    def make_mock_controller(self, initial_ctrl_state):
+    def make_mock_controller(
+        self, initial_ctrl_state: IntEnum
+    ) -> simple_mock_controller.SimpleMockController:
         return simple_mock_controller.SimpleMockController(
             log=self.log,
             initial_state=initial_ctrl_state,
