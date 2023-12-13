@@ -73,7 +73,7 @@ def make_connect_error_info(
 
 # TODO DM-39787: remove this function once MTHexapod supports
 # MTRotator's simplified states.
-def make_state_transition_dict() -> dict:
+def make_state_transition_dict() -> dict[tuple, list]:
     """Make a dict of state transition commands and states.
 
     This only is used to go from any non-fault starting state
