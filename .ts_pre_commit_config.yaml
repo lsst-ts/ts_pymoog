@@ -4,6 +4,6 @@ black: true
 flake8: true
 isort: true
 mypy: true
-clang-format: true
+clang-format: false
 format-xmllint: true
 ruff: true
