@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v1.2.0
+------
+
+* Add configureEmergencyAcceleration & configureEmergencyJerk to `SimpleCsc`.
+
 v1.1.3
 ------
 
