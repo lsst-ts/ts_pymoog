@@ -25,6 +25,7 @@ from enum import IntEnum
 from pathlib import Path
 
 from lsst.ts import hexrotcomm, salobj, utils
+from lsst.ts.xml.component_info import ComponentInfo
 from lsst.ts.xml.enums.MTHexapod import ApplicationStatus, EnabledSubstate
 
 from . import simple_mock_controller
@@ -99,6 +100,19 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         simulation_mode: int = 1,
         override: str = "",
     ) -> None:
+        # Workaround the checking of "do_" commands in upstream
+        supported_command_names = [
+            name[3:] for name in dir(self) if name.startswith("do_")
+        ]
+
+        component_info = ComponentInfo("MTRotator", "sal")
+        topic_names = [
+            name[4:] for name in component_info.topics if name.startswith("cmd_")
+        ]
+        for topic_name in topic_names:
+            if topic_name not in supported_command_names:
+                setattr(self, f"do_{topic_name}", self._do_nothing)
+
         super().__init__(
             name="MTRotator",
             index=0,
@@ -111,6 +125,9 @@ class SimpleCsc(hexrotcomm.BaseCsc):
             override=override,
             simulation_mode=simulation_mode,
         )
+
+    async def _do_nothing(self, data: salobj.BaseMsgType) -> None:
+        raise salobj.ExpectedError("Not implemented")
 
     async def do_move(self, data: salobj.BaseMsgType) -> None:
         """Specify a position."""
@@ -128,30 +145,6 @@ class SimpleCsc(hexrotcomm.BaseCsc):
         await self.run_command(
             code=simple_mock_controller.SimpleCommandCode.MOVE, param1=data.position
         )
-
-    async def do_configureAcceleration(self, data: salobj.BaseMsgType) -> None:
-        raise salobj.ExpectedError("Not implemented")
-
-    async def do_configureVelocity(self, data: salobj.BaseMsgType) -> None:
-        raise salobj.ExpectedError("Not implemented")
-
-    async def do_fault(self, data: salobj.BaseMsgType) -> None:
-        raise salobj.ExpectedError("Not implemented")
-
-    async def do_stop(self, data: salobj.BaseMsgType) -> None:
-        raise salobj.ExpectedError("Not implemented")
-
-    async def do_track(self, data: salobj.BaseMsgType) -> None:
-        raise salobj.ExpectedError("Not implemented")
-
-    async def do_trackStart(self, data: salobj.BaseMsgType) -> None:
-        raise salobj.ExpectedError("Not implemented")
-
-    async def do_configureEmergencyAcceleration(self, data: salobj.BaseMsgType) -> None:
-        raise salobj.ExpectedError("Not implemented")
-
-    async def do_configureEmergencyJerk(self, data: salobj.BaseMsgType) -> None:
-        raise salobj.ExpectedError("Not implemented")
 
     async def config_callback(self, client: CommandTelemetryClient) -> None:
         """Called when the TCP/IP controller outputs configuration.
