@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v1.2.1
+------
+
+* Minimize the dependency of rotator xml in **SimpleCsc** class. 
+
 v1.2.0
 ------
 
