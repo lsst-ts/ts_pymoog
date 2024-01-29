@@ -147,6 +147,12 @@ class SimpleCsc(hexrotcomm.BaseCsc):
     async def do_trackStart(self, data: salobj.BaseMsgType) -> None:
         raise salobj.ExpectedError("Not implemented")
 
+    async def do_configureEmergencyAcceleration(self, data: salobj.BaseMsgType) -> None:
+        raise salobj.ExpectedError("Not implemented")
+
+    async def do_configureEmergencyJerk(self, data: salobj.BaseMsgType) -> None:
+        raise salobj.ExpectedError("Not implemented")
+
     async def config_callback(self, client: CommandTelemetryClient) -> None:
         """Called when the TCP/IP controller outputs configuration.
 
