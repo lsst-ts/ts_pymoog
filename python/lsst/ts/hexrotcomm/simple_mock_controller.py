@@ -49,6 +49,7 @@ ENABLE_CONFIG = True
 
 class SimpleCommandCode(enum.IntEnum):
     SET_STATE = 1
+    ENABLE_DRIVES = 2
     SET_ENABLED_SUBSTATE = enum.auto()
     MOVE = enum.auto()
 
@@ -58,6 +59,7 @@ class SimpleConfig(ctypes.Structure):
 
     _pack_ = 1
     _fields_ = [
+        ("drives_enabled", ctypes.c_bool),
         ("min_position", ctypes.c_double),
         ("max_position", ctypes.c_double),
         ("max_velocity", ctypes.c_double),
@@ -113,9 +115,10 @@ class SimpleMockController(BaseMockController):
         log: logging.Logger,
         port: int = SIMPLE_TELEMETRY_PORT,
         host: str = tcpip.LOCAL_HOST,
-        initial_state: enum.IntEnum = ControllerState.OFFLINE,
+        initial_state: enum.IntEnum = ControllerState.STANDBY,
     ) -> None:
         config = SimpleConfig()
+        config.drives_enabled = False
         config.min_position = -25
         config.max_position = 25
         config.max_velocity = 47
