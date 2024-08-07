@@ -191,6 +191,7 @@ class CommandTelemetryClientTestCase(unittest.IsolatedAsyncioTestCase):
                 config = client.config
                 assert config.min_position == self.initial_min_position
                 assert config.max_position == self.initial_max_position
+                assert config.drives_enabled is False
                 telemetry = await asyncio.wait_for(
                     client.next_telemetry(), timeout=STD_TIMEOUT
                 )

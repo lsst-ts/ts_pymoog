@@ -95,15 +95,10 @@ class BaseCscTestCase(salobj.BaseCscTestCase):
                 # Wait for and check the intermediate controller state,
                 # so unit test code only needs to check the final state
                 # (don't swallow the final state, for backwards compatibility).
-                for controller_state in (
-                    ControllerState.OFFLINE,
-                    ControllerState.STANDBY,
-                    ControllerState.DISABLED,
-                ):
-                    await self.assert_next_sample(
-                        topic=self.remote.evt_controllerState,
-                        controllerState=controller_state,
-                    )
+                await self.assert_next_sample(
+                    topic=self.remote.evt_controllerState,
+                    controllerState=ControllerState.STANDBY,
+                )
             yield
 
     async def check_bin_script(

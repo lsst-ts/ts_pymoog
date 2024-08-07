@@ -230,10 +230,12 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             )
             await self.assert_next_summary_state(salobj.State.ENABLED)
 
-            self.csc.mock_ctrl.set_state(ControllerState.DISABLED)
+            assert self.csc.mock_ctrl.config.drives_enabled is True
+
+            self.csc.mock_ctrl.set_state(ControllerState.STANDBY)
             await self.assert_next_sample(
                 topic=self.remote.evt_controllerState,
-                controllerState=ControllerState.DISABLED,
+                controllerState=ControllerState.STANDBY,
             )
             await self.assert_next_summary_state(salobj.State.DISABLED)
 

@@ -29,11 +29,7 @@ import typing
 from enum import IntEnum
 
 from lsst.ts import tcpip, utils
-from lsst.ts.xml.enums.MTHexapod import (
-    ControllerState,
-    EnabledSubstate,
-    OfflineSubstate,
-)
+from lsst.ts.xml.enums.MTHexapod import ControllerState, EnabledSubstate
 
 from . import enums, structs
 
@@ -64,7 +60,8 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
     CommandCode : `enum`
         Command codes.
     config : `ctypes.Structure`
-        Configuration data. May be modified.
+        Configuration data that must contain the "drives_enabled" field as
+        boolean. May be modified.
     telemetry : `ctypes.Structure`
         Telemetry data. Modified by `update_telemetry`.
     port : `int`
@@ -106,7 +103,7 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
         telemetry: ctypes.Structure,
         port: int,
         host: str | None = tcpip.LOCALHOST_IPV4,
-        initial_state: IntEnum = ControllerState.OFFLINE,
+        initial_state: IntEnum = ControllerState.STANDBY,
     ) -> None:
         self.CommandCode = CommandCode
         self.config = config
@@ -114,7 +111,6 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
 
         # Dict of command key: command
         self.command_table = {
-            (CommandCode.SET_STATE, enums.SetStateParam.START): self.do_start,  # type: ignore[attr-defined]
             (CommandCode.SET_STATE, enums.SetStateParam.ENABLE): self.do_enable,  # type: ignore[attr-defined]
             (
                 CommandCode.SET_STATE,  # type: ignore[attr-defined]
@@ -122,17 +118,9 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
             ): self.do_standby,
             (
                 CommandCode.SET_STATE,  # type: ignore[attr-defined]
-                enums.SetStateParam.DISABLE,
-            ): self.do_disable,
-            (CommandCode.SET_STATE, enums.SetStateParam.EXIT): self.do_exit,  # type: ignore[attr-defined]
-            (
-                CommandCode.SET_STATE,  # type: ignore[attr-defined]
                 enums.SetStateParam.CLEAR_ERROR,
             ): self.do_clear_error,
-            (
-                CommandCode.SET_STATE,  # type: ignore[attr-defined]
-                enums.SetStateParam.ENTER_CONTROL,
-            ): self.do_enter_control,
+            CommandCode.ENABLE_DRIVES: self.do_enable_drives,  # type: ignore[attr-defined]
         }
         self.command_table.update(extra_commands)
 
@@ -162,12 +150,6 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
         return self.telemetry.state
 
     @property
-    # TODO DM-39787: remove offline_substate in this whole package,
-    # once MTHexapod supports MTRotator's simplified states.
-    def offline_substate(self) -> int:
-        return self.telemetry.offline_substate
-
-    @property
     def enabled_substate(self) -> int:
         return self.telemetry.enabled_substate
 
@@ -189,7 +171,6 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
     def assert_state(
         self,
         state: int,
-        offline_substate: int | None = None,
         enabled_substate: int | None = None,
     ) -> None:
         """Check the state and, optionally, the substate.
@@ -198,8 +179,6 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
         ----------
         state : int
             Required state.
-        offline_substate : int or None, optional
-            Required offline substate, or None to not check.
         enabled_substate : int or None, optional
             Required enabled substate, or None to not check.
 
@@ -212,43 +191,23 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
             raise CommandError(
                 f"state={self.state!r}; must be {state!r} for this command."
             )
-        if offline_substate is not None and self.offline_substate != offline_substate:
-            raise CommandError(
-                f"offline_substate={self.offline_substate!r}; "
-                f"must be {offline_substate!r} for this command."
-            )
         if enabled_substate is not None and self.enabled_substate != enabled_substate:
             raise CommandError(
                 f"enabled_substate={self.enabled_substate!r}; "
                 f"must be {enabled_substate!r} for this command."
             )
 
-    async def do_enter_control(self, command: structs.Command) -> None:
-        self.assert_state(
-            ControllerState.OFFLINE,
-            offline_substate=OfflineSubstate.AVAILABLE,
-        )
-        self.set_state(ControllerState.STANDBY)
-
-    async def do_start(self, command: structs.Command) -> None:
-        self.assert_state(ControllerState.STANDBY)
-        self.set_state(ControllerState.DISABLED)
+    async def do_enable_drives(self, command: structs.Command) -> None:
+        self.config.drives_enabled = bool(command.param1)
+        await self.write_config()
 
     async def do_enable(self, command: structs.Command) -> None:
-        self.assert_state(ControllerState.DISABLED)
+        self.assert_state(ControllerState.STANDBY)
         self.set_state(ControllerState.ENABLED)
 
-    async def do_disable(self, command: structs.Command) -> None:
-        self.assert_state(ControllerState.ENABLED)
-        self.set_state(ControllerState.DISABLED)
-
     async def do_standby(self, command: structs.Command) -> None:
-        self.assert_state(ControllerState.DISABLED)
+        self.assert_state(ControllerState.ENABLED)
         self.set_state(ControllerState.STANDBY)
-
-    async def do_exit(self, command: structs.Command) -> None:
-        self.assert_state(ControllerState.STANDBY)
-        self.set_state(ControllerState.OFFLINE)
 
     async def do_clear_error(self, command: structs.Command) -> None:
         # The real low-level controller accepts this command if the
@@ -329,22 +288,10 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
         -----
         Sets the substates as follows:
 
-        * `lsst.ts.xml.enums.MTHexapod.OfflineSubstate.AVAILABLE`
-          if state == `lsst.ts.xml.enums.MTHexapod.ControllerState.OFFLINE`
         * `lsst.ts.xml.enums.MTHexapod.EnabledSubstate.STATIONARY`
           if state == `lsst.ts.xml.enums.MTHexapod.ControllerState.ENABLED`
-
-        The real controller goes to substate
-        `lsst.ts.xml.enums.MTHexapod.OfflineSubstate.PUBLISH_ONLY` when going
-        offline, but requires the engineering user interface (EUI) to get out
-        of that state, and we don't have an EUI for the mock controller!
         """
         self.telemetry.state = ControllerState(state)
-        self.telemetry.offline_substate = (
-            OfflineSubstate.AVAILABLE
-            if self.telemetry.state == ControllerState.OFFLINE
-            else 0
-        )
         self.telemetry.enabled_substate = (
             EnabledSubstate.STATIONARY
             if self.telemetry.state == ControllerState.ENABLED
@@ -352,7 +299,6 @@ class BaseMockController(tcpip.OneClientReadLoopServer, abc.ABC):
         )
         self.log.debug(
             f"set_state: state={ControllerState(self.telemetry.state)!r}; "
-            f"offline_substate={OfflineSubstate(self.telemetry.offline_substate)}; "
             f"enabled_substate={EnabledSubstate(self.telemetry.enabled_substate)}"
         )
 
