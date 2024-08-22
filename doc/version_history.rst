@@ -6,6 +6,12 @@
 Version History
 ###############
 
+v1.3.0
+------
+
+* Remove the code related to the deprecated state machine in controller.
+* Migrate the functions from **ts_mtrotator**.
+
 v1.2.2
 ------
 

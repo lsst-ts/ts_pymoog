@@ -21,7 +21,6 @@
 
 __all__ = ["SimpleCsc"]
 
-from enum import IntEnum
 from pathlib import Path
 
 from lsst.ts import hexrotcomm, salobj, utils
@@ -162,6 +161,7 @@ class SimpleCsc(hexrotcomm.BaseCsc):
             followingErrorThreshold=0,
             trackingSuccessPositionThreshold=0,
             trackingLostTimeout=0,
+            drivesEnabled=client.config.drives_enabled,
         )
         await self.evt_commandableByDDS.set_write(state=True)
 
@@ -193,14 +193,8 @@ class SimpleCsc(hexrotcomm.BaseCsc):
             timestamp=utils.current_tai(),
         )
 
-    # TODO DM-39787: remove the initial_ctrl_state argument
-    # and always use STANDBY once MTHexapod supports
-    # MTRotator's simplified states.
-    def make_mock_controller(
-        self, initial_ctrl_state: IntEnum
-    ) -> simple_mock_controller.SimpleMockController:
+    def make_mock_controller(self) -> simple_mock_controller.SimpleMockController:
         return simple_mock_controller.SimpleMockController(
             log=self.log,
-            initial_state=initial_ctrl_state,
             port=0,
         )

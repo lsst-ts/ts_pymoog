@@ -71,59 +71,6 @@ def make_connect_error_info(
     return error_code, err_msg
 
 
-# TODO DM-39787: remove this function once MTHexapod supports
-# MTRotator's simplified states.
-def make_state_transition_dict() -> dict[tuple, list]:
-    """Make a dict of state transition commands and states.
-
-    This only is used to go from any non-fault starting state
-    to enabled state, but in a way it's simpler to just compute
-    the whole thing (if only to emulate the code for set_summary_state
-    in salobj).
-
-    The keys are (beginning state, ending state).
-    The values are the `SetStateParam`.
-    """
-    ordered_states = (
-        ControllerState.OFFLINE,
-        ControllerState.STANDBY,
-        ControllerState.DISABLED,
-        ControllerState.ENABLED,
-    )
-
-    basic_state_transition_commands = {
-        (ControllerState.OFFLINE, ControllerState.STANDBY): SetStateParam.ENTER_CONTROL,
-        (ControllerState.STANDBY, ControllerState.DISABLED): SetStateParam.START,
-        (ControllerState.DISABLED, ControllerState.ENABLED): SetStateParam.ENABLE,
-        (ControllerState.ENABLED, ControllerState.DISABLED): SetStateParam.DISABLE,
-        (ControllerState.DISABLED, ControllerState.STANDBY): SetStateParam.STANDBY,
-        (ControllerState.STANDBY, ControllerState.OFFLINE): SetStateParam.EXIT,
-    }
-
-    # compute transitions from non-FAULT to all other states
-    state_transition_dict: dict = dict()
-    for beg_ind, beg_state in enumerate(ordered_states):
-        for end_ind, end_state in enumerate(ordered_states):
-            if beg_ind == end_ind:
-                state_transition_dict[(beg_state, end_state)] = []
-                continue
-            step = 1 if end_ind > beg_ind else -1
-            command_state_list = []
-            for next_ind in range(beg_ind, end_ind, step):
-                from_state = ordered_states[next_ind]
-                to_state = ordered_states[next_ind + step]
-                command = basic_state_transition_commands[from_state, to_state]
-                command_state_list.append((command, to_state))
-            state_transition_dict[(beg_state, end_state)] = command_state_list
-
-    return state_transition_dict
-
-
-# TODO DM-39787: remove this constant once MTHexapod supports
-# MTRotator's simplified states.
-_STATE_TRANSITION_DICT = make_state_transition_dict()
-
-
 class BaseCsc(salobj.ConfigurableCsc):
     """Base CSC for talking to Moog hexpod or rotator controllers.
 
@@ -136,7 +83,7 @@ class BaseCsc(salobj.ConfigurableCsc):
         A value is required if the component is indexed.
     CommandCode : `enum`
         Command codes supported by the low-level controller.
-        Must include an item ``SET_STATE``, the only command code
+        Must include ``SET_STATE`` and ``ENABLE_DRIVES``, the two command codes
         used by this class.
     ConfigClass : `ctypes.Structure`
         Configuration structure.
@@ -288,17 +235,8 @@ class BaseCsc(salobj.ConfigurableCsc):
         self.config = config
 
     @abc.abstractmethod
-    # TODO DM-39787: remove the initial_ctrl_state argument
-    # and always use STANDBY once MTHexapod supports
-    # MTRotator's simplified states.
-    def make_mock_controller(self, initial_ctrl_state: int) -> None:
-        """Construct and return a mock controller.
-
-        Parameters
-        ----------
-        initial_ctrl_state : `int`
-            Initial controller state.
-        """
+    def make_mock_controller(self) -> None:
+        """Construct and return a mock controller."""
         raise NotImplementedError()
 
     def assert_commandable(self) -> None:
@@ -560,9 +498,7 @@ class BaseCsc(salobj.ConfigurableCsc):
             if self.simulation_mode != 0:
                 host = tcpip.LOCALHOST_IPV4
                 if self.allow_mock_controller:
-                    # TODO DM-39787: remove the initial_ctrl_state argument
-                    # once MTHexapod supports MTRotator's simplified states.
-                    self.mock_ctrl = self.make_mock_controller(ControllerState.OFFLINE)
+                    self.mock_ctrl = self.make_mock_controller()
 
                     # Workaround the mypy check
                     assert self.mock_ctrl is not None
@@ -645,8 +581,6 @@ class BaseCsc(salobj.ConfigurableCsc):
                 self.log.exception("disconnect: self.mock_ctrl.close failed")
             self.mock_ctrl = None
 
-    # TODO DM-39787: replace this with the version from RotatorCsc
-    # in ts_mtrotator, once MTHexapod supports MTRotator's simplified states.
     async def enable_controller(self) -> None:
         """Enable the low-level controller.
 
@@ -659,15 +593,15 @@ class BaseCsc(salobj.ConfigurableCsc):
         """
         self.assert_commandable()
 
-        # Desired controller state
-        desired_state = ControllerState.ENABLED
-
         # Workaround the mypy check
         assert self.client is not None
 
         self.log.info(
             f"Enable low-level controller; initial state={self.client.telemetry.state}"
         )
+
+        if self.client.telemetry.state == ControllerState.ENABLED:
+            return
 
         if self.client.telemetry.state == ControllerState.FAULT:
             # Start by issuing the clearError command.
@@ -677,32 +611,61 @@ class BaseCsc(salobj.ConfigurableCsc):
                 param1=SetStateParam.CLEAR_ERROR,
             )
 
-        current_state = self.client.telemetry.state
-        if current_state == desired_state:
-            # we are already in the desired state
-            return
+        if self.client.telemetry.state != ControllerState.STANDBY:
+            raise salobj.ExpectedError(
+                f"Before enable: low-level controller state={self.client.telemetry.state}; "
+                f"expected {ControllerState.STANDBY!r}"
+            )
 
-        command_state_list = _STATE_TRANSITION_DICT[(current_state, desired_state)]
+        # Enable the drives first
+        await self._enable_drives(True)
 
-        for command_param, resulting_state in command_state_list:
-            self.assert_commandable()
-            try:
-                self.log.debug(f"Issue SET_STATE command with param1={command_param!r}")
-                await self.run_command(
-                    code=self.CommandCode.SET_STATE, param1=command_param  # type: ignore[attr-defined]
-                )
-                # Waiting for the controller state is not necessary, but it
-                # makes sure that the CSC publishes all intermediate
-                # controller states in the controllerState event,
-                # making the data more predictable and easier to understand.
-                await self.wait_controller_state(resulting_state)
-                current_state = resulting_state
-            except Exception as e:
-                errmsg = (
-                    f"SET_STATE command with param1={command_param!r} failed: {e!r}"
-                )
-                self.log.error(errmsg)
-                raise salobj.ExpectedError(errmsg) from e
+        try:
+            await self.run_command(
+                code=self.CommandCode.SET_STATE,  # type: ignore[attr-defined]
+                param1=SetStateParam.ENABLE,
+            )
+        except Exception as e:
+            print(f"Low-level controller enable failed: {e!r}")
+            raise
+
+        await self.wait_controller_state(ControllerState.ENABLED)
+
+    async def _enable_drives(self, status: bool, time: float = 1.0) -> None:
+        """Enable the drives.
+
+        Parameters
+        ----------
+        status : `bool`
+            True if enable the drives. Otherwise, False.
+        time : `float`, optional
+            Sleep time in second. (the default is 1.0)
+        """
+
+        await self.run_command(
+            code=self.CommandCode.ENABLE_DRIVES,  # type: ignore[attr-defined]
+            param1=float(status),
+        )
+        await asyncio.sleep(time)
+
+    async def begin_standby(self, data: salobj.BaseMsgType) -> None:
+        try:
+            await self._enable_drives(False)
+        except Exception as error:
+            self.log.warning(f"Ignoring the error when disabling the drives: {error}.")
+
+    async def begin_disable(self, data: salobj.BaseMsgType) -> None:
+        try:
+            await self.run_command(
+                code=self.CommandCode.SET_STATE,  # type: ignore[attr-defined]
+                param1=SetStateParam.STANDBY,
+            )
+            await self._enable_drives(False)
+
+        except Exception as error:
+            self.log.warning(
+                f"Ignoring the error when putting the controller to STANDBY state: {error}."
+            )
 
     @abc.abstractmethod
     async def config_callback(self, client: CommandTelemetryClient) -> None:
@@ -763,8 +726,6 @@ class BaseCsc(salobj.ConfigurableCsc):
             )
 
     @abc.abstractmethod
-    # TODO DM-39787: remove offlineSubstate from the example
-    # once MTHexapod supports MTRotator's simplified states.
     async def telemetry_callback(self, client: CommandTelemetryClient) -> None:
         """Called when the TCP/IP controller outputs telemetry.
 
@@ -784,7 +745,6 @@ class BaseCsc(salobj.ConfigurableCsc):
 
             await self.evt_controllerState.set_write(
                 controllerState=int(client.telemetry.state),
-                offlineSubstate=int(client.telemetry.offline_substate),
                 enabledSubstate=int(client.telemetry.enabled_substate),
             )
             await self.evt_commandableByDDS.set_write(
