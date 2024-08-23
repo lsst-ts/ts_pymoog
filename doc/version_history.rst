@@ -6,6 +6,13 @@
 Version History
 ###############
 
+v1.3.1
+------
+
+* Fix the race condition in ``BaseCsc.basic_telemetry_callback()`` with the ``BaseCsc.begin_disable()``.
+The reason we can do so is because the controller has a simplified state machine now.
+It only has the **Standby**, **Enabled**, and **Fault** states.
+
 v1.3.0
 ------
 
