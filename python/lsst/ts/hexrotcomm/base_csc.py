@@ -709,10 +709,6 @@ class BaseCsc(salobj.ConfigurableCsc):
             return
 
         disable_conditions = []
-        if client.telemetry.state != ControllerState.ENABLED:
-            disable_conditions.append(
-                f"the low-level controller is in non-enabled state {client.telemetry.state!r}"
-            )
         if not self.evt_commandableByDDS.data.state:
             disable_conditions.append("the EUI has taken control")
         if disable_conditions:
