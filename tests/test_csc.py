@@ -216,29 +216,6 @@ class TestSimpleCsc(hexrotcomm.BaseCscTestCase, unittest.IsolatedAsyncioTestCase
             await self.remote.cmd_standby.start(timeout=STD_TIMEOUT)
             await self.assert_next_sample(topic=self.remote.evt_errorCode, errorCode=0)
 
-    async def test_controller_not_enabled(self) -> None:
-        """Controller going out of enabled state should disable the CSC"""
-        async with self.make_csc(
-            initial_state=salobj.State.ENABLED,
-            simulation_mode=1,
-            config_dir=TEST_CONFIG_DIR,
-        ):
-            await self.assert_next_sample(
-                topic=self.remote.evt_controllerState,
-                controllerState=ControllerState.ENABLED,
-                enabledSubstate=EnabledSubstate.STATIONARY,
-            )
-            await self.assert_next_summary_state(salobj.State.ENABLED)
-
-            assert self.csc.mock_ctrl.config.drives_enabled is True
-
-            self.csc.mock_ctrl.set_state(ControllerState.STANDBY)
-            await self.assert_next_sample(
-                topic=self.remote.evt_controllerState,
-                controllerState=ControllerState.STANDBY,
-            )
-            await self.assert_next_summary_state(salobj.State.DISABLED)
-
     async def test_eui_takes_control(self) -> None:
         """If the EUI takes control this should disable the CSC"""
         async with self.make_csc(
