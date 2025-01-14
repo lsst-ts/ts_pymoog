@@ -656,16 +656,23 @@ class BaseCsc(salobj.ConfigurableCsc):
 
     async def begin_disable(self, data: salobj.BaseMsgType) -> None:
         try:
-            await self.run_command(
-                code=self.CommandCode.SET_STATE,  # type: ignore[attr-defined]
-                param1=SetStateParam.STANDBY,
-            )
-            await self._enable_drives(False)
+            await self.standby_controller()
 
         except Exception as error:
             self.log.warning(
                 f"Ignoring the error when putting the controller to STANDBY state: {error}."
             )
+
+    async def standby_controller(self) -> None:
+        """Standby the low-level controller."""
+
+        self.assert_commandable()
+
+        await self.run_command(
+            code=self.CommandCode.SET_STATE,  # type: ignore[attr-defined]
+            param1=SetStateParam.STANDBY,
+        )
+        await self._enable_drives(False)
 
     @abc.abstractmethod
     async def config_callback(self, client: CommandTelemetryClient) -> None:
