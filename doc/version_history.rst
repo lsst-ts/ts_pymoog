@@ -6,6 +6,11 @@
 Version History
 ###############
 
+v1.3.2
+------
+
+* Add the ``BaseCsc.standby_controller()``.
+
 v1.3.1
 ------
 
